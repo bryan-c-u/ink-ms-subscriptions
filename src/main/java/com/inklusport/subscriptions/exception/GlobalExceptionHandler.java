@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
-import com.inklusport.suscripciones.dto.response.ErrorResponse;
+import com.inklusport.subscriptions.dto.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

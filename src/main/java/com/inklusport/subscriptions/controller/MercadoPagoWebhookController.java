@@ -1,7 +1,7 @@
-package com.inklusport.suscripciones.controller;
+package com.inklusport.subscriptions.controller;
 
-import com.inklusport.suscripciones.mercadopago.MercadoPagoWebhookPayload;
-import com.inklusport.suscripciones.service.PagoWebhookService;
+import com.inklusport.subscriptions.payment.MercadoPagoWebhookPayload;
+import com.inklusport.subscriptions.service.PagoWebhookService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

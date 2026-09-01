@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class EventoNoConfiguradoComoPagoException extends RuntimeException {
     public EventoNoConfiguradoComoPagoException(String eventoId) {

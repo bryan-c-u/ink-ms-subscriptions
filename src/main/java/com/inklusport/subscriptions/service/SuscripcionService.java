@@ -1,32 +1,29 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.*;
-import com.inklusport.suscripciones.entity.HistorialSuscripcion;
-import com.inklusport.suscripciones.entity.Plan;
-import com.inklusport.suscripciones.entity.Suscripcion;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.exception.PlanInactivoException;
-import com.inklusport.suscripciones.exception.SuscripcionInactivaException;
-import com.inklusport.suscripciones.exception.SuscripcionNotFoundException;
-import com.inklusport.suscripciones.exception.LimiteEventosExcedidoException;
-import com.inklusport.suscripciones.repository.HistorialSuscripcionRepository;
-import com.inklusport.suscripciones.repository.PlanRepository;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.dto.*;
+import com.inklusport.subscriptions.entity.HistorialSuscripcion;
+import com.inklusport.subscriptions.entity.Plan;
+import com.inklusport.subscriptions.entity.Suscripcion;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.enums.OrigenSuscripcion;
+import com.inklusport.subscriptions.enums.TipoMovimiento;
+import com.inklusport.subscriptions.exception.LimiteEventosExcedidoException;
+import com.inklusport.subscriptions.exception.PlanInactivoException;
+import com.inklusport.subscriptions.exception.SuscripcionInactivaException;
+import com.inklusport.subscriptions.exception.SuscripcionNotFoundException;
+import com.inklusport.subscriptions.repository.HistorialSuscripcionRepository;
+import com.inklusport.subscriptions.repository.PlanRepository;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * RF58-RF61, RF63, RF66: ciclo de vida de la suscripcion de un organizador. La
- * orquestacion del cobro (pasarela, activacion al aprobar) vive en PagoSuscripcionService.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -44,22 +41,23 @@ public class SuscripcionService {
         if (!Boolean.TRUE.equals(plan.getActivo())) {
             throw new PlanInactivoException(plan.getId());
         }
-
         suscripcionRepository.findFirstByOrganizadorIdOrderByFechaCreacionDesc(organizadorId).ifPresent(existente -> {
             if (existente.getEstado() == EstadoSuscripcion.ACTIVA || existente.getEstado() == EstadoSuscripcion.SUSPENDIDA) {
                 throw new SuscripcionInactivaException(
-                        "Ya existe una suscripcion en estado " + existente.getEstado() +
-                                "; usa la renovacion o espera a que finalice su ciclo actual.");
+                        "Ya existe una suscripcion en estado " + existente.getEstado());
             }
         });
 
+        LocalDate hoy = LocalDate.now();
         Suscripcion suscripcion = new Suscripcion();
         suscripcion.setOrganizadorId(organizadorId);
-        suscripcion.setPlan(plan);
-        suscripcion.setFechaInicio(LocalDate.now());
-        suscripcion.setFechaFin(LocalDate.now());
+        suscripcion.aplicarTerminos(plan);
+        suscripcion.setFechaInicio(hoy);
+        suscripcion.setFechaFin(hoy);
+        suscripcion.setPeriodoInicio(hoy.withDayOfMonth(1));
         suscripcion.setEstado(EstadoSuscripcion.SUSPENDIDA);
-        suscripcion.setEventosCreadosMes(0);
+        suscripcion.setEventosCreadosPeriodo(0);
+        suscripcion.setOrigen(OrigenSuscripcion.COMPRA);
         suscripcion.setRenovacionAutomatica(Boolean.TRUE.equals(request.getRenovacionAutomatica()));
         suscripcion = suscripcionRepository.save(suscripcion);
 
@@ -72,12 +70,10 @@ public class SuscripcionService {
         if (suscripcion.getEstado() == EstadoSuscripcion.CANCELADA) {
             throw new SuscripcionInactivaException("No se puede renovar una suscripcion cancelada");
         }
-
         Plan plan = request.getPlanId() != null ? planService.obtenerEntidad(request.getPlanId()) : suscripcion.getPlan();
         if (!Boolean.TRUE.equals(plan.getActivo())) {
             throw new PlanInactivoException(plan.getId());
         }
-
         return pagoSuscripcionService.iniciarPago(suscripcion, plan);
     }
 
@@ -105,17 +101,23 @@ public class SuscripcionService {
 
     @Transactional(readOnly = true)
     public List<HistorialSuscripcionResponse> historialPorOrganizador(String organizadorId) {
-        return historialSuscripcionRepository.findBySuscripcion_OrganizadorIdOrderByFechaMovimientoDesc(organizadorId).stream()
-                .map(this::toHistorialResponse)
-                .collect(Collectors.toList());
+        return historialSuscripcionRepository.findBySuscripcion_OrganizadorIdOrderByFechaMovimientoDesc(organizadorId)
+                .stream().map(this::toHistorialResponse).collect(Collectors.toList());
     }
 
     @Transactional
     public SuscripcionResponse cambiarEstado(Long suscripcionId, EstadoSuscripcion nuevoEstado) {
         Suscripcion suscripcion = obtenerEntidad(suscripcionId);
+        EstadoSuscripcion anterior = suscripcion.getEstado();
         suscripcion.setEstado(nuevoEstado);
+        if (nuevoEstado == EstadoSuscripcion.CANCELADA) {
+            suscripcion.setFechaCancelacion(java.time.LocalDateTime.now());
+        }
+        if (nuevoEstado == EstadoSuscripcion.SUSPENDIDA) {
+            suscripcion.setFechaSuspension(java.time.LocalDateTime.now());
+        }
         suscripcion = suscripcionRepository.save(suscripcion);
-        log.info("Suscripcion {} cambio de estado a {}", suscripcionId, nuevoEstado);
+        registrarHistorial(suscripcion, mapEstadoAMovimiento(nuevoEstado), anterior, nuevoEstado, null);
         return toResponse(suscripcion);
     }
 
@@ -123,12 +125,15 @@ public class SuscripcionService {
     public PuedeCrearEventoResponse puedeCrearEvento(String organizadorId) {
         return suscripcionRepository
                 .findFirstByOrganizadorIdAndEstadoOrderByFechaCreacionDesc(organizadorId, EstadoSuscripcion.ACTIVA)
-                .map(s -> PuedeCrearEventoResponse.builder()
-                        .puedeCrear(s.getEventosCreadosMes() < s.getPlan().getLimiteEventosMes())
-                        .eventosCreadosMes(s.getEventosCreadosMes())
-                        .limiteEventosMes(s.getPlan().getLimiteEventosMes())
-                        .planNombre(s.getPlan().getNombre())
-                        .build())
+                .map(s -> {
+                    resetPeriodoSiCorresponde(s);
+                    return PuedeCrearEventoResponse.builder()
+                            .puedeCrear(s.puedeCrearEvento())
+                            .eventosCreadosMes(s.getEventosCreadosPeriodo())
+                            .limiteEventosMes(s.getLimiteEventosAplicado())
+                            .planNombre(s.getPlan().getNombre())
+                            .build();
+                })
                 .orElseGet(() -> PuedeCrearEventoResponse.builder()
                         .puedeCrear(false)
                         .eventosCreadosMes(0)
@@ -143,14 +148,13 @@ public class SuscripcionService {
                 .findFirstByOrganizadorIdAndEstadoOrderByFechaCreacionDesc(organizadorId, EstadoSuscripcion.ACTIVA)
                 .orElseThrow(() -> new SuscripcionNotFoundException(
                         "El organizador " + organizadorId + " no tiene una suscripcion activa"));
-
-        if (suscripcion.getEventosCreadosMes() >= suscripcion.getPlan().getLimiteEventosMes()) {
-            throw new LimiteEventosExcedidoException(organizadorId, suscripcion.getPlan().getLimiteEventosMes());
+        resetPeriodoSiCorresponde(suscripcion);
+        if (!suscripcion.puedeCrearEvento()) {
+            throw new LimiteEventosExcedidoException(organizadorId, suscripcion.getLimiteEventosAplicado());
         }
         suscripcionRepository.incrementarEventosCreados(suscripcion.getId());
     }
 
-    /** RF66: idempotente, si el organizador ya tiene alguna suscripcion no la reemplaza. */
     @Transactional
     public SuscripcionResponse asignarPlanGratuito(String organizadorId) {
         var existente = suscripcionRepository.findFirstByOrganizadorIdOrderByFechaCreacionDesc(organizadorId);
@@ -158,24 +162,25 @@ public class SuscripcionService {
             return toResponse(existente.get());
         }
 
-        Plan planGratuito = planRepository.findByActivoTrue().stream()
-                .filter(p -> p.getPrecio().compareTo(BigDecimal.ZERO) == 0)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "No hay un plan gratuito activo configurado; no se puede asignar el plan inicial"));
+        Plan planGratuito = planRepository.findFirstByEsPlanInicialTrueAndActivoTrue()
+                .or(() -> planRepository.findFirstByEsGratuitoTrueAndActivoTrue())
+                .orElseThrow(() -> new IllegalStateException("No hay un plan gratuito inicial configurado"));
 
+        LocalDate hoy = LocalDate.now();
         Suscripcion suscripcion = new Suscripcion();
         suscripcion.setOrganizadorId(organizadorId);
-        suscripcion.setPlan(planGratuito);
-        suscripcion.setFechaInicio(LocalDate.now());
-        suscripcion.setFechaFin(LocalDate.now());
-        suscripcion.setEstado(EstadoSuscripcion.SUSPENDIDA);
-        suscripcion.setEventosCreadosMes(0);
+        suscripcion.aplicarTerminos(planGratuito);
+        suscripcion.setFechaInicio(hoy);
+        suscripcion.setFechaFin(hoy.plusDays(planGratuito.getDuracionDias()));
+        suscripcion.setPeriodoInicio(hoy.withDayOfMonth(1));
+        suscripcion.setEstado(EstadoSuscripcion.ACTIVA);
+        suscripcion.setEventosCreadosPeriodo(0);
+        suscripcion.setOrigen(OrigenSuscripcion.ASIGNACION_INICIAL);
         suscripcion.setRenovacionAutomatica(false);
         suscripcion = suscripcionRepository.save(suscripcion);
 
-        pagoSuscripcionService.iniciarPago(suscripcion, planGratuito);
-        log.info("Plan gratuito asignado automaticamente al organizador {}", organizadorId);
+        registrarHistorial(suscripcion, TipoMovimiento.ASIGNACION_INICIAL, null, EstadoSuscripcion.ACTIVA, null);
+        log.info("Plan gratuito inicial asignado a {}", organizadorId);
         return toResponse(suscripcion);
     }
 
@@ -185,7 +190,6 @@ public class SuscripcionService {
                 .orElseThrow(() -> new SuscripcionNotFoundException(suscripcionId));
     }
 
-    /** Publico para que los controladores de pagos/comprobantes tambien puedan validar la propiedad. */
     @Transactional(readOnly = true)
     public Suscripcion obtenerPropia(String organizadorId, Long suscripcionId) {
         Suscripcion suscripcion = obtenerEntidad(suscripcionId);
@@ -195,17 +199,51 @@ public class SuscripcionService {
         return suscripcion;
     }
 
+    private void resetPeriodoSiCorresponde(Suscripcion s) {
+        LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
+        if (s.getPeriodoInicio() == null || s.getPeriodoInicio().isBefore(inicioMes)) {
+            s.setPeriodoInicio(inicioMes);
+            s.setEventosCreadosPeriodo(0);
+            suscripcionRepository.save(s);
+        }
+    }
+
+    private void registrarHistorial(Suscripcion suscripcion, TipoMovimiento tipo,
+                                    EstadoSuscripcion anterior, EstadoSuscripcion nuevo, Long planAnteriorId) {
+        HistorialSuscripcion h = new HistorialSuscripcion();
+        h.setSuscripcion(suscripcion);
+        h.setTipoMovimiento(tipo);
+        h.setPlanAnteriorId(planAnteriorId);
+        h.setPlanNuevoId(suscripcion.getPlan().getId());
+        h.setEstadoAnterior(anterior != null ? anterior.name() : null);
+        h.setEstadoNuevo(nuevo != null ? nuevo.name() : null);
+        h.setFechaFinNueva(suscripcion.getFechaFin());
+        historialSuscripcionRepository.save(h);
+    }
+
+    private TipoMovimiento mapEstadoAMovimiento(EstadoSuscripcion estado) {
+        return switch (estado) {
+            case CANCELADA -> TipoMovimiento.CANCELACION;
+            case SUSPENDIDA -> TipoMovimiento.SUSPENSION;
+            case VENCIDA -> TipoMovimiento.VENCIMIENTO;
+            case ACTIVA -> TipoMovimiento.REACTIVACION;
+        };
+    }
+
     private SuscripcionResponse toResponse(Suscripcion s) {
         return SuscripcionResponse.builder()
                 .id(s.getId())
                 .organizadorId(s.getOrganizadorId())
                 .planId(s.getPlan().getId())
                 .planNombre(s.getPlan().getNombre())
+                .precioAplicado(s.getPrecioAplicado())
+                .limiteEventosAplicado(s.getLimiteEventosAplicado())
+                .porcentajeComisionAplicado(s.getPorcentajeComisionAplicado())
                 .fechaInicio(s.getFechaInicio())
                 .fechaFin(s.getFechaFin())
                 .estado(s.getEstado())
-                .eventosCreadosMes(s.getEventosCreadosMes())
-                .limiteEventosMes(s.getPlan().getLimiteEventosMes())
+                .eventosCreadosMes(s.getEventosCreadosPeriodo())
+                .limiteEventosMes(s.getLimiteEventosAplicado())
                 .renovacionAutomatica(s.getRenovacionAutomatica())
                 .fechaCreacion(s.getFechaCreacion())
                 .build();

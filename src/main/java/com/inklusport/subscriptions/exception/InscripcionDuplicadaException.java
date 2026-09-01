@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class InscripcionDuplicadaException extends RuntimeException {
     public InscripcionDuplicadaException(String usuarioId, String eventoId) {

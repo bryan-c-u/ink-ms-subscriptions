@@ -1,16 +1,17 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.mercadopago.PaymentStatusResult;
+import com.inklusport.subscriptions.entity.WebhookPasarela;
+import com.inklusport.subscriptions.enums.Pasarela;
+import com.inklusport.subscriptions.payment.PaymentStatusResult;
+import com.inklusport.subscriptions.repository.TransaccionPasarelaRepository;
+import com.inklusport.subscriptions.repository.WebhookPasarelaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * RF70: punto unico de entrada para notificaciones de Mercado Pago. Consulta el pago
- * real contra la API (nunca confia en el payload del webhook) y despacha al servicio
- * correspondiente segun el prefijo de la referencia externa que se genero al crear
- * la preferencia de pago.
- */
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -19,22 +20,44 @@ public class PagoWebhookService {
     private final PaymentGatewayClient paymentGatewayClient;
     private final PagoSuscripcionService pagoSuscripcionService;
     private final PagoEventoService pagoEventoService;
+    private final WebhookPasarelaRepository webhookPasarelaRepository;
+    private final TransaccionPasarelaRepository transaccionPasarelaRepository;
 
+    @Transactional
     public void procesarNotificacion(String paymentIdExterno) {
-        PaymentStatusResult status = paymentGatewayClient.consultarPago(paymentIdExterno);
-        String referencia = status.getReferenciaExterna();
+        WebhookPasarela logWebhook = new WebhookPasarela();
+        logWebhook.setPasarela(Pasarela.MERCADOPAGO);
+        logWebhook.setTipoNotificacion("payment");
+        logWebhook.setIdExterno(paymentIdExterno);
+        logWebhook.setPayload("{\"id\":\"" + paymentIdExterno + "\"}");
+        logWebhook.setProcesado(false);
 
-        if (referencia == null || referencia.isBlank()) {
-            log.warn("Notificacion de Mercado Pago {} sin referencia externa, se ignora", paymentIdExterno);
-            return;
-        }
+        try {
+            PaymentStatusResult status = paymentGatewayClient.consultarPago(paymentIdExterno);
+            String referencia = status.getReferenciaExterna();
+            if (referencia == null || referencia.isBlank()) {
+                logWebhook.setResultado("sin referencia externa");
+                webhookPasarelaRepository.save(logWebhook);
+                return;
+            }
 
-        if (referencia.startsWith(PagoSuscripcionService.PREFIJO_REFERENCIA)) {
-            pagoSuscripcionService.confirmarPago(status);
-        } else if (referencia.startsWith(PagoEventoService.PREFIJO_REFERENCIA)) {
-            pagoEventoService.confirmarPago(status);
-        } else {
-            log.warn("Referencia externa con prefijo desconocido: {}", referencia);
+            transaccionPasarelaRepository.findByReferenciaExterna(referencia)
+                    .ifPresent(logWebhook::setTransaccion);
+
+            if (referencia.startsWith(PagoSuscripcionService.PREFIJO_REFERENCIA)) {
+                pagoSuscripcionService.confirmarPago(status);
+            } else if (referencia.startsWith(PagoEventoService.PREFIJO_REFERENCIA)) {
+                pagoEventoService.confirmarPago(status);
+            } else {
+                log.warn("Referencia externa con prefijo desconocido: {}", referencia);
+            }
+            logWebhook.setProcesado(true);
+            logWebhook.setResultado("ok");
+            logWebhook.setFechaProceso(LocalDateTime.now());
+        } catch (Exception e) {
+            logWebhook.setResultado(e.getMessage());
+            log.error("Error procesando webhook {}: {}", paymentIdExterno, e.getMessage());
         }
+        webhookPasarelaRepository.save(logWebhook);
     }
 }

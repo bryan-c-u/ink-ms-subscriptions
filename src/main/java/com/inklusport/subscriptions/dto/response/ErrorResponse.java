@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.dto.response;
+package com.inklusport.subscriptions.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

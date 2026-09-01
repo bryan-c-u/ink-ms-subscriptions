@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.entity;
+package com.inklusport.subscriptions.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -20,6 +20,9 @@ public class BeneficioPlan {
     @JoinColumn(name = "plan_id", nullable = false)
     private Plan plan;
 
-    @Column(name = "beneficio", length = 255, nullable = false)
+    @Column(nullable = false, length = 255)
     private String beneficio;
+
+    @Column(nullable = false)
+    private Integer orden = 0;
 }

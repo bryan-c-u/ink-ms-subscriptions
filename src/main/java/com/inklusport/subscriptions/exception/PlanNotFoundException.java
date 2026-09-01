@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class PlanNotFoundException extends RuntimeException {
     public PlanNotFoundException(Long id) {

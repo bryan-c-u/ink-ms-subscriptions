@@ -1,17 +1,18 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.entity.ComprobantePago;
-import com.inklusport.suscripciones.entity.PagoEvento;
-import com.inklusport.suscripciones.entity.PagoSuscripcion;
-import com.inklusport.suscripciones.repository.ComprobantePagoRepository;
+import com.inklusport.subscriptions.entity.ComprobantePago;
+import com.inklusport.subscriptions.entity.PagoEvento;
+import com.inklusport.subscriptions.entity.PagoSuscripcion;
+import com.inklusport.subscriptions.enums.TipoComprobante;
+import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.openpdf.text.Chunk;
-import org.openpdf.text.Document;
-import org.openpdf.text.Font;
-import org.openpdf.text.FontFactory;
-import org.openpdf.text.Paragraph;
-import org.openpdf.text.pdf.PdfWriter;
+import com.lowagie.text.Chunk;
+import com.lowagie.text.Document;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,10 +23,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * Genera el comprobante en PDF (RF69) y su registro en BD, tanto para pagos de
- * inscripcion a eventos como para pagos de suscripcion de organizador.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -38,67 +35,70 @@ public class ComprobanteService {
 
     @Transactional
     public ComprobantePago generarComprobanteEvento(PagoEvento pagoEvento, String concepto) {
-        return generar(pagoEvento, null, concepto, pagoEvento.getMonto(),
-                pagoEvento.getReferenciaTransaccion(), pagoEvento.getFechaPago());
+        return generar(pagoEvento, null, TipoComprobante.INSCRIPCION, concepto, pagoEvento.getMonto(),
+                pagoEvento.getMoneda(), pagoEvento.getReferenciaTransaccion(), pagoEvento.getFechaPago(),
+                pagoEvento.getUsuarioId());
     }
 
     @Transactional
     public ComprobantePago generarComprobanteSuscripcion(PagoSuscripcion pagoSuscripcion, String concepto) {
-        return generar(null, pagoSuscripcion, concepto, pagoSuscripcion.getMonto(),
-                pagoSuscripcion.getReferenciaTransaccion(), pagoSuscripcion.getFechaPago());
+        return generar(null, pagoSuscripcion, TipoComprobante.SUSCRIPCION, concepto, pagoSuscripcion.getMonto(),
+                pagoSuscripcion.getMoneda(), pagoSuscripcion.getReferenciaTransaccion(), pagoSuscripcion.getFechaPago(),
+                pagoSuscripcion.getSuscripcion().getOrganizadorId());
     }
 
-    /** Puede devolver null si el comprobante se registro pero su PDF no se pudo generar (ver generarPdf). */
     public File obtenerArchivo(ComprobantePago comprobante) {
         String ruta = comprobante.getUrlPdf();
         return (ruta != null && !ruta.isBlank()) ? new File(ruta) : null;
     }
 
-    private ComprobantePago generar(PagoEvento pagoEvento, PagoSuscripcion pagoSuscripcion, String concepto,
-                                     BigDecimal monto, String referencia, LocalDateTime fechaPago) {
+    private ComprobantePago generar(PagoEvento pagoEvento, PagoSuscripcion pagoSuscripcion, TipoComprobante tipo,
+                                    String concepto, BigDecimal monto, String moneda, String referencia,
+                                    LocalDateTime fechaPago, String emailDestino) {
         String numero = "CMP-" + UUID.randomUUID().toString().substring(0, 12).toUpperCase();
-        File pdf = generarPdf(numero, concepto, monto, referencia, fechaPago);
+        File pdf = generarPdf(numero, concepto, monto, moneda, referencia, fechaPago);
 
         ComprobantePago comprobante = new ComprobantePago();
         comprobante.setPagoEvento(pagoEvento);
         comprobante.setPagoSuscripcion(pagoSuscripcion);
+        comprobante.setTransaccion(pagoEvento != null ? pagoEvento.getTransaccion()
+                : (pagoSuscripcion != null ? pagoSuscripcion.getTransaccion() : null));
         comprobante.setNumeroComprobante(numero);
+        comprobante.setNumeroTransaccion(referencia);
+        comprobante.setTipo(tipo);
+        comprobante.setMonto(monto);
+        comprobante.setMoneda(moneda != null ? moneda : "COP");
+        comprobante.setDetalleEvento(concepto);
+        comprobante.setEmailDestino(emailDestino);
         comprobante.setUrlPdf(pdf != null ? pdf.getPath() : null);
         return comprobantePagoRepository.save(comprobante);
     }
 
-    private File generarPdf(String numero, String concepto, BigDecimal monto, String referencia,
-                             LocalDateTime fechaPago) {
+    private File generarPdf(String numero, String concepto, BigDecimal monto, String moneda, String referencia,
+                            LocalDateTime fechaPago) {
         try {
             File dir = new File(storagePath);
             if (!dir.exists() && !dir.mkdirs()) {
                 throw new java.io.IOException("No se pudo crear el directorio de comprobantes: " + storagePath);
             }
             File file = new File(dir, numero + ".pdf");
-
             Document document = new Document();
             PdfWriter.getInstance(document, new FileOutputStream(file));
             document.open();
-
             Font tituloFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
             Font subtituloFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14);
             Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
-
             document.add(new Paragraph("InkluSport", tituloFont));
             document.add(new Paragraph("Comprobante de pago", subtituloFont));
             document.add(Chunk.NEWLINE);
             document.add(new Paragraph("Numero de comprobante: " + numero, normalFont));
             document.add(new Paragraph("Concepto: " + concepto, normalFont));
-            document.add(new Paragraph("Monto pagado: $" + monto.toPlainString(), normalFont));
+            document.add(new Paragraph("Monto pagado: " + (moneda != null ? moneda : "COP") + " " + monto.toPlainString(), normalFont));
             document.add(new Paragraph("Referencia de transaccion: " + (referencia != null ? referencia : "N/A"), normalFont));
             document.add(new Paragraph("Fecha de pago: " + fechaPago, normalFont));
-
             document.close();
             return file;
         } catch (Exception e) {
-            // No se relanza: el pago ya fue aprobado por Mercado Pago y la suscripcion/inscripcion
-            // ya se activo en la misma transaccion. Un fallo de disco al escribir el PDF no debe
-            // revertir un cobro real; el comprobante queda registrado sin archivo y se puede regenerar.
             log.error("Error generando el PDF del comprobante {}: {}", numero, e.getMessage(), e);
             return null;
         }

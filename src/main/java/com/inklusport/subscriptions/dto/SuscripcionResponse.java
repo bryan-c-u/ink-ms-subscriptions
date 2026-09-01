@@ -1,11 +1,12 @@
-package com.inklusport.suscripciones.dto;
+package com.inklusport.subscriptions.dto;
 
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -18,6 +19,9 @@ public class SuscripcionResponse {
     private String organizadorId;
     private Long planId;
     private String planNombre;
+    private BigDecimal precioAplicado;
+    private Integer limiteEventosAplicado;
+    private BigDecimal porcentajeComisionAplicado;
     private LocalDate fechaInicio;
     private LocalDate fechaFin;
     private EstadoSuscripcion estado;

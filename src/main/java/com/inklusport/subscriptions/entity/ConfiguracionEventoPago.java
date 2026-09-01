@@ -1,10 +1,11 @@
-package com.inklusport.suscripciones.entity;
+package com.inklusport.subscriptions.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,26 +21,29 @@ public class ConfiguracionEventoPago {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // evento_id: String (UUID) en vez de BIGINT, se alinea con el futuro id de
-    // ink-ms-eventos. Unicidad de evento_id se valida en el service (no en la BD)
-    // para respetar el resto del script SQL original tal cual fue entregado.
-    @Column(name = "evento_id", length = 36, nullable = false)
+    @Column(name = "evento_id", nullable = false, unique = true, length = 36)
     private String eventoId;
 
-    // Email del organizador (ver nota en Suscripcion.organizadorId).
-    @Column(name = "organizador_id", length = 100, nullable = false)
+    @Column(name = "organizador_id", nullable = false, length = 100)
     private String organizadorId;
 
-    @Column(name = "es_pago")
+    @Column(name = "es_pago", nullable = false)
     private Boolean esPago = false;
 
-    @Column(name = "valor_inscripcion", precision = 10, scale = 2)
+    @Column(name = "valor_inscripcion", precision = 12, scale = 2)
     private BigDecimal valorInscripcion;
+
+    @Column(nullable = false, length = 3)
+    private String moneda = "COP";
 
     @Column(name = "porcentaje_comision", precision = 5, scale = 2)
     private BigDecimal porcentajeComision;
 
     @CreationTimestamp
-    @Column(name = "fecha_creacion")
+    @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
+
+    @UpdateTimestamp
+    @Column(name = "fecha_actualizacion", nullable = false)
+    private LocalDateTime fechaActualizacion;
 }

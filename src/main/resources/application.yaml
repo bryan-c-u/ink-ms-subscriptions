@@ -1,3 +1,106 @@
 spring:
   application:
-    name: subscriptions
+    name: ink-ms-subscriptions
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format-sql: true
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+
+server:
+  port: 3005
+
+jwt:
+  secret: ${JWT_SECRET:}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://localhost:3001}
+
+app:
+  mail-enabled: ${MAIL_ENABLED:false}
+  suscripciones:
+    dias-aviso-vencimiento: ${SUBSCRIPTION_WARNING_DAYS:7}
+  comprobantes:
+    storage-path: ${COMPROBANTES_PATH:./comprobantes}
+  payment:
+    mode: ${PAYMENT_GATEWAY_MODE:mock}
+  mercadopago:
+    access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
+    public-key: ${MERCADOPAGO_PUBLIC_KEY:}
+    webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+    currency: COP
+    notification-url: ${MERCADOPAGO_NOTIFICATION_URL:}
+    back-url-success: ${MERCADOPAGO_BACK_URL_SUCCESS:http://localhost:4200/pagos/exito}
+    back-url-pending: ${MERCADOPAGO_BACK_URL_PENDING:http://localhost:4200/pagos/pendiente}
+    back-url-failure: ${MERCADOPAGO_BACK_URL_FAILURE:http://localhost:4200/pagos/error}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.inklusport.subscriptions: ${LOG_LEVEL:INFO}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://mysql:3306/inklusport_subscriptions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:subscriptions;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  mail:
+    host: localhost
+    port: 25
+jwt:
+  secret: test-secret-key-that-is-long-enough-for-hs512-algorithm-inklusport-subscriptions
+  expiration: 86400000
+app:
+  mail-enabled: false
+  payment:
+    mode: mock

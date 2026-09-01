@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.config;
+package com.inklusport.subscriptions.config;
 
-import com.inklusport.suscripciones.security.JwtTokenProvider;
+import com.inklusport.subscriptions.security.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

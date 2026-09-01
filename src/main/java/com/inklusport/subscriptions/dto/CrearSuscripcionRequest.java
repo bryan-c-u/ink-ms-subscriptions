@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.dto;
+package com.inklusport.subscriptions.dto;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

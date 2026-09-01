@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.dto;
+package com.inklusport.subscriptions.dto;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -12,26 +12,28 @@ import java.util.List;
 @Data
 public class PlanRequest {
 
-    @NotBlank(message = "El nombre del plan es obligatorio")
+    @NotBlank
     private String nombre;
-
     private String descripcion;
 
-    @NotNull(message = "El precio es obligatorio")
-    @DecimalMin(value = "0.0", message = "El precio no puede ser negativo")
+    @NotNull
+    @DecimalMin("0.0")
     private BigDecimal precio;
 
-    @NotNull(message = "El limite de eventos por mes es obligatorio")
-    @Min(value = 0, message = "El limite de eventos por mes no puede ser negativo")
+    private String moneda = "COP";
+
+    @Min(0)
     private Integer limiteEventosMes;
 
-    @NotNull(message = "El porcentaje de comision es obligatorio")
-    @DecimalMin(value = "0.0", message = "El porcentaje de comision no puede ser negativo")
+    @NotNull
+    @DecimalMin("0.0")
     private BigDecimal porcentajeComision;
 
-    @NotNull(message = "La duracion en dias es obligatoria")
-    @Min(value = 1, message = "La duracion debe ser de al menos 1 dia")
+    @NotNull
+    @Min(1)
     private Integer duracionDias;
 
+    private Boolean esGratuito;
+    private Boolean esPlanInicial;
     private List<String> beneficios;
 }

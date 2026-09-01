@@ -1,7 +1,7 @@
-package com.inklusport.suscripciones.controller;
+package com.inklusport.subscriptions.controller;
 
-import com.inklusport.suscripciones.dto.ReporteFinancieroResponse;
-import com.inklusport.suscripciones.service.ReporteFinancieroService;
+import com.inklusport.subscriptions.dto.ReporteFinancieroResponse;
+import com.inklusport.subscriptions.service.ReporteFinancieroService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;

@@ -1,7 +1,7 @@
-package com.inklusport.suscripciones.config;
+package com.inklusport.subscriptions.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.inklusport.suscripciones.dto.response.ErrorResponse;
+import com.inklusport.subscriptions.dto.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;

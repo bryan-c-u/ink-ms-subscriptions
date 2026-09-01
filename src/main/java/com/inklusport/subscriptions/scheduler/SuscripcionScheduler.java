@@ -1,9 +1,14 @@
-package com.inklusport.suscripciones.scheduler;
+package com.inklusport.subscriptions.scheduler;
 
-import com.inklusport.suscripciones.entity.Suscripcion;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
-import com.inklusport.suscripciones.service.EmailService;
+import com.inklusport.subscriptions.entity.NotificacionVencimiento;
+import com.inklusport.subscriptions.entity.Suscripcion;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.enums.TipoMovimiento;
+import com.inklusport.subscriptions.entity.HistorialSuscripcion;
+import com.inklusport.subscriptions.repository.HistorialSuscripcionRepository;
+import com.inklusport.subscriptions.repository.NotificacionVencimientoRepository;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,55 +17,93 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
 
-/** RF59 (expiracion), RF60 (reinicio mensual de limites) y RF62 (aviso de vencimiento). */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class SuscripcionScheduler {
 
     private final SuscripcionRepository suscripcionRepository;
+    private final HistorialSuscripcionRepository historialSuscripcionRepository;
+    private final NotificacionVencimientoRepository notificacionVencimientoRepository;
     private final EmailService emailService;
 
-    @Value("${app.suscripciones.dias-aviso-vencimiento:5}")
-    private int diasAvisoVencimiento;
+    @Value("${app.suscripciones.dias-aviso-vencimiento:7}")
+    private String diasAvisoVencimiento;
 
-    /** Todos los dias a la 1:00 am: marca como VENCIDA toda suscripcion activa cuya fecha_fin ya paso. */
     @Scheduled(cron = "0 0 1 * * *")
     @Transactional
     public void marcarSuscripcionesVencidas() {
         List<Suscripcion> vencidas = suscripcionRepository
                 .findByEstadoAndFechaFinBefore(EstadoSuscripcion.ACTIVA, LocalDate.now());
-        vencidas.forEach(s -> s.setEstado(EstadoSuscripcion.VENCIDA));
+        for (Suscripcion s : vencidas) {
+            s.setEstado(EstadoSuscripcion.VENCIDA);
+            HistorialSuscripcion h = new HistorialSuscripcion();
+            h.setSuscripcion(s);
+            h.setTipoMovimiento(TipoMovimiento.VENCIMIENTO);
+            h.setPlanNuevoId(s.getPlan().getId());
+            h.setEstadoAnterior(EstadoSuscripcion.ACTIVA.name());
+            h.setEstadoNuevo(EstadoSuscripcion.VENCIDA.name());
+            historialSuscripcionRepository.save(h);
+        }
         suscripcionRepository.saveAll(vencidas);
         if (!vencidas.isEmpty()) {
             log.info("{} suscripcion(es) marcada(s) como VENCIDA", vencidas.size());
         }
     }
 
-    /** Todos los dias a las 8:00 am: avisa por correo a quienes esten por vencer (RF62). */
     @Scheduled(cron = "0 0 8 * * *")
-    @Transactional(readOnly = true)
+    @Transactional
     public void avisarVencimientoProximo() {
         LocalDate hoy = LocalDate.now();
-        LocalDate limite = hoy.plusDays(diasAvisoVencimiento);
+        List<Integer> dias = Arrays.stream(diasAvisoVencimiento.split(","))
+                .map(String::trim)
+                .filter(v -> !v.isBlank())
+                .map(Integer::parseInt)
+                .toList();
+        if (dias.isEmpty()) {
+            dias = List.of(7);
+        }
+        int max = dias.stream().mapToInt(Integer::intValue).max().orElse(7);
         List<Suscripcion> porVencer = suscripcionRepository
-                .findByEstadoAndFechaFinBetween(EstadoSuscripcion.ACTIVA, hoy, limite);
+                .findByEstadoAndFechaFinBetween(EstadoSuscripcion.ACTIVA, hoy, hoy.plusDays(max));
 
         for (Suscripcion suscripcion : porVencer) {
             long diasRestantes = ChronoUnit.DAYS.between(hoy, suscripcion.getFechaFin());
-            emailService.enviarAvisoVencimiento(suscripcion.getOrganizadorId(),
-                    suscripcion.getPlan().getNombre(), (int) diasRestantes);
+            if (!dias.contains((int) diasRestantes)) {
+                continue;
+            }
+            var yaEnviada = notificacionVencimientoRepository.findBySuscripcionIdAndDiasAntesAndFechaProgramada(
+                    suscripcion.getId(), (int) diasRestantes, hoy);
+            if (yaEnviada.isPresent()) {
+                continue;
+            }
+            NotificacionVencimiento n = new NotificacionVencimiento();
+            n.setSuscripcion(suscripcion);
+            n.setDiasAntes((int) diasRestantes);
+            n.setFechaProgramada(hoy);
+            n.setDestinatario(suscripcion.getOrganizadorId());
+            try {
+                emailService.enviarAvisoVencimiento(suscripcion.getOrganizadorId(),
+                        suscripcion.getPlan().getNombre(), (int) diasRestantes);
+                n.setEstado("ENVIADA");
+                n.setFechaEnvio(LocalDateTime.now());
+            } catch (Exception e) {
+                n.setEstado("FALLIDA");
+                n.setErrorEnvio(e.getMessage());
+            }
+            notificacionVencimientoRepository.save(n);
         }
     }
 
-    /** El primer dia de cada mes a medianoche: reinicia el contador de eventos por mes (RF60). */
     @Scheduled(cron = "0 0 0 1 * *")
     @Transactional
     public void reiniciarContadorEventosMensual() {
-        suscripcionRepository.reiniciarContadorEventosMensual();
-        log.info("Contador mensual de eventos creados reiniciado para las suscripciones activas");
+        suscripcionRepository.reiniciarContadorEventosMensual(LocalDate.now().withDayOfMonth(1));
+        log.info("Contador mensual de eventos reiniciado");
     }
 }

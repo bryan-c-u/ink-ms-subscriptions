@@ -1,12 +1,12 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.ConfiguracionEventoPagoRequest;
-import com.inklusport.suscripciones.dto.ConfiguracionEventoPagoResponse;
-import com.inklusport.suscripciones.entity.ConfiguracionEventoPago;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.exception.ConfiguracionEventoPagoNotFoundException;
-import com.inklusport.suscripciones.repository.ConfiguracionEventoPagoRepository;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoRequest;
+import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoResponse;
+import com.inklusport.subscriptions.entity.ConfiguracionEventoPago;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.exception.ConfiguracionEventoPagoNotFoundException;
+import com.inklusport.subscriptions.repository.ConfiguracionEventoPagoRepository;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,7 +17,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** RF65: configuracion de un evento como gratuito o pago por parte del organizador. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -29,8 +28,7 @@ public class ConfiguracionEventoPagoService {
     @Transactional
     public ConfiguracionEventoPagoResponse configurar(String organizadorId, ConfiguracionEventoPagoRequest request) {
         if (configuracionEventoPagoRepository.existsByEventoId(request.getEventoId())) {
-            throw new IllegalStateException(
-                    "El evento " + request.getEventoId() + " ya tiene una configuracion de pago; actualizala en su lugar");
+            throw new IllegalStateException("El evento " + request.getEventoId() + " ya tiene configuracion de pago");
         }
         if (Boolean.TRUE.equals(request.getEsPago()) && request.getValorInscripcion() == null) {
             throw new IllegalArgumentException("Debe indicar el valor de inscripcion para un evento de pago");
@@ -41,31 +39,25 @@ public class ConfiguracionEventoPagoService {
         config.setOrganizadorId(organizadorId);
         config.setEsPago(Boolean.TRUE.equals(request.getEsPago()));
         config.setValorInscripcion(config.getEsPago() ? request.getValorInscripcion() : null);
+        config.setMoneda("COP");
         config.setPorcentajeComision(config.getEsPago() ? comisionVigente(organizadorId) : BigDecimal.ZERO);
-
         config = configuracionEventoPagoRepository.save(config);
-        log.info("Evento {} configurado como {} por {}", request.getEventoId(),
-                config.getEsPago() ? "pago" : "gratuito", organizadorId);
         return toResponse(config);
     }
 
     @Transactional
     public ConfiguracionEventoPagoResponse actualizar(String organizadorId, String eventoId,
-                                                        ConfiguracionEventoPagoRequest request) {
+                                                      ConfiguracionEventoPagoRequest request) {
         ConfiguracionEventoPago config = obtenerPropia(organizadorId, eventoId);
         if (Boolean.TRUE.equals(request.getEsPago()) && request.getValorInscripcion() == null) {
             throw new IllegalArgumentException("Debe indicar el valor de inscripcion para un evento de pago");
         }
-
         config.setEsPago(Boolean.TRUE.equals(request.getEsPago()));
         config.setValorInscripcion(config.getEsPago() ? request.getValorInscripcion() : null);
-        if (config.getEsPago() && (config.getPorcentajeComision() == null
-                || config.getPorcentajeComision().compareTo(BigDecimal.ZERO) == 0)) {
+        if (config.getEsPago()) {
             config.setPorcentajeComision(comisionVigente(organizadorId));
         }
-
-        config = configuracionEventoPagoRepository.save(config);
-        return toResponse(config);
+        return toResponse(configuracionEventoPagoRepository.save(config));
     }
 
     @Transactional(readOnly = true)
@@ -97,7 +89,9 @@ public class ConfiguracionEventoPagoService {
     private BigDecimal comisionVigente(String organizadorId) {
         return suscripcionRepository
                 .findFirstByOrganizadorIdAndEstadoOrderByFechaCreacionDesc(organizadorId, EstadoSuscripcion.ACTIVA)
-                .map(s -> s.getPlan().getPorcentajeComision())
+                .map(s -> s.getPorcentajeComisionAplicado() != null
+                        ? s.getPorcentajeComisionAplicado()
+                        : s.getPlan().getPorcentajeComision())
                 .orElse(BigDecimal.ZERO);
     }
 

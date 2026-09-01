@@ -1,7 +1,9 @@
-package com.inklusport.suscripciones.enums;
+package com.inklusport.subscriptions.enums;
 
 public enum EstadoPago {
     PENDIENTE,
     APROBADO,
-    RECHAZADO
+    RECHAZADO,
+    REEMBOLSADO,
+    CANCELADO
 }

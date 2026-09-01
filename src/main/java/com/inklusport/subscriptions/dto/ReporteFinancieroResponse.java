@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.dto;
+package com.inklusport.subscriptions.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -23,9 +23,12 @@ public class EmailService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
+    @Value("${app.mail-enabled:false}")
+    private boolean mailEnabled;
+
     private boolean correoDeshabilitado() {
-        if (fromEmail == null || fromEmail.isBlank()) {
-            log.warn("spring.mail.username (MAIL_USERNAME) no esta configurado; se omite el envio de correo");
+        if (!mailEnabled || fromEmail == null || fromEmail.isBlank()) {
+            log.debug("Correo deshabilitado; se omite el envio");
             return true;
         }
         return false;
@@ -33,25 +36,22 @@ public class EmailService {
 
     @Async
     public void enviarComprobantePago(String to, String numeroComprobante, String concepto,
-                                       BigDecimal monto, File adjuntoPdf) {
-        if (correoDeshabilitado()) {
+                                      BigDecimal monto, File adjuntoPdf) {
+        if (correoDeshabilitado() || to == null || !to.contains("@")) {
             return;
         }
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, adjuntoPdf != null, "UTF-8");
-
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject("Comprobante de pago - InkluSport");
             helper.setText(buildComprobanteContent(numeroComprobante, concepto, monto), true);
-
             if (adjuntoPdf != null && adjuntoPdf.exists()) {
                 helper.addAttachment("comprobante-" + numeroComprobante + ".pdf", adjuntoPdf);
             }
-
             mailSender.send(message);
-            log.info("Comprobante {} enviado a: {}", numeroComprobante, to);
+            log.info("Comprobante {} enviado a {}", numeroComprobante, to);
         } catch (MessagingException e) {
             log.error("Error al enviar comprobante {} a {}: {}", numeroComprobante, to, e.getMessage());
         }
@@ -59,20 +59,18 @@ public class EmailService {
 
     @Async
     public void enviarAvisoVencimiento(String to, String planNombre, int diasRestantes) {
-        if (correoDeshabilitado()) {
+        if (correoDeshabilitado() || to == null || !to.contains("@")) {
+            log.info("Aviso de vencimiento del plan {} ({} dias) para {}", planNombre, diasRestantes, to);
             return;
         }
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject("Tu suscripcion esta por vencer - InkluSport");
             helper.setText(buildAvisoVencimientoContent(planNombre, diasRestantes), true);
-
             mailSender.send(message);
-            log.info("Aviso de vencimiento enviado a: {}", to);
         } catch (MessagingException e) {
             log.error("Error al enviar aviso de vencimiento a {}: {}", to, e.getMessage());
         }
@@ -80,44 +78,22 @@ public class EmailService {
 
     private String buildComprobanteContent(String numeroComprobante, String concepto, BigDecimal monto) {
         return """
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body style="font-family: Arial, sans-serif;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #1E3A8A;">InkluSport</h2>
-                    <h3>Comprobante de pago</h3>
-                    <p>Tu pago fue procesado exitosamente.</p>
-                    <table style="width: 100%%; border-collapse: collapse;">
-                        <tr><td style="padding: 6px; color:#666;">Concepto</td><td style="padding: 6px;"><strong>%s</strong></td></tr>
-                        <tr><td style="padding: 6px; color:#666;">Monto</td><td style="padding: 6px;"><strong>$%s</strong></td></tr>
-                        <tr><td style="padding: 6px; color:#666;">N&uacute;mero de comprobante</td><td style="padding: 6px;"><strong>%s</strong></td></tr>
-                    </table>
-                    <p>Adjuntamos el comprobante en formato PDF para tus registros.</p>
-                    <hr>
-                    <p style="font-size: 12px; color: #666;">InkluSport - Deporte para todos</p>
-                </div>
-            </body>
-            </html>
+            <html><body style="font-family: Arial, sans-serif;">
+            <h2>InkluSport</h2>
+            <p>Tu pago fue procesado exitosamente.</p>
+            <p>Concepto: <strong>%s</strong></p>
+            <p>Monto: <strong>$%s</strong></p>
+            <p>Comprobante: <strong>%s</strong></p>
+            </body></html>
             """.formatted(concepto, monto.toPlainString(), numeroComprobante);
     }
 
     private String buildAvisoVencimientoContent(String planNombre, int diasRestantes) {
         return """
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body style="font-family: Arial, sans-serif;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #1E3A8A;">InkluSport</h2>
-                    <h3>Tu suscripcion esta por vencer</h3>
-                    <p>Tu suscripcion al plan <strong>%s</strong> vence en <strong>%d dia(s)</strong>.</p>
-                    <p>Renueva tu suscripcion para seguir disfrutando de todos los beneficios de tu plan sin interrupciones.</p>
-                    <hr>
-                    <p style="font-size: 12px; color: #666;">InkluSport - Deporte para todos</p>
-                </div>
-            </body>
-            </html>
+            <html><body style="font-family: Arial, sans-serif;">
+            <h2>InkluSport</h2>
+            <p>Tu suscripcion al plan <strong>%s</strong> vence en <strong>%d dia(s)</strong>.</p>
+            </body></html>
             """.formatted(planNombre, diasRestantes);
     }
 }

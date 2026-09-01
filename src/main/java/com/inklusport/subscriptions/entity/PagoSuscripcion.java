@@ -1,6 +1,7 @@
-package com.inklusport.suscripciones.entity;
+package com.inklusport.subscriptions.entity;
 
-import com.inklusport.suscripciones.enums.EstadoPago;
+import com.inklusport.subscriptions.enums.EstadoPago;
+import com.inklusport.subscriptions.enums.TipoPagoSuscripcion;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -25,8 +26,19 @@ public class PagoSuscripcion {
     @JoinColumn(name = "suscripcion_id", nullable = false)
     private Suscripcion suscripcion;
 
-    @Column(name = "monto", precision = 10, scale = 2, nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transaccion_id")
+    private TransaccionPasarela transaccion;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TipoPagoSuscripcion tipo = TipoPagoSuscripcion.NUEVA;
+
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal monto;
+
+    @Column(nullable = false, length = 3)
+    private String moneda = "COP";
 
     @Column(name = "metodo_pago", length = 50)
     private String metodoPago;
@@ -35,17 +47,10 @@ public class PagoSuscripcion {
     private String referenciaTransaccion;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "estado", nullable = false)
-    private EstadoPago estado;
-
-    // Bloqueo optimista: si Mercado Pago envia dos notificaciones del mismo pago casi
-    // simultaneas, solo una podra confirmarlo; la otra falla con OptimisticLockException
-    // (el webhook la registra y responde 200 igual). Evita doble activacion / doble comprobante.
-    @Version
-    @Column(name = "version")
-    private Long version;
+    @Column(nullable = false, length = 20)
+    private EstadoPago estado = EstadoPago.PENDIENTE;
 
     @CreationTimestamp
-    @Column(name = "fecha_pago")
+    @Column(name = "fecha_pago", nullable = false, updatable = false)
     private LocalDateTime fechaPago;
 }
