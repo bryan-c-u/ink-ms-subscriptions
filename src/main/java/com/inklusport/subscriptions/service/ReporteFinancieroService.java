@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de reportes financieros de eventos y suscripciones.
+ */
 @Service
 @RequiredArgsConstructor
 public class ReporteFinancieroService {
@@ -21,6 +24,14 @@ public class ReporteFinancieroService {
     private final PagoEventoRepository pagoEventoRepository;
     private final PagoSuscripcionRepository pagoSuscripcionRepository;
 
+    /**
+     * Genera el reporte financiero de un organizador en un rango de fechas.
+     *
+     * @param organizadorId identificador del organizador
+     * @param desde         inicio del período
+     * @param hasta         fin del período
+     * @return reporte de ingresos por eventos
+     */
     @Transactional(readOnly = true)
     public ReporteFinancieroResponse reporteOrganizador(String organizadorId, LocalDateTime desde, LocalDateTime hasta) {
         return construir(desde, hasta,
@@ -28,6 +39,13 @@ public class ReporteFinancieroService {
                 BigDecimal.ZERO);
     }
 
+    /**
+     * Genera el reporte financiero global, incluyendo suscripciones.
+     *
+     * @param desde inicio del período
+     * @param hasta fin del período
+     * @return reporte consolidado de la plataforma
+     */
     @Transactional(readOnly = true)
     public ReporteFinancieroResponse reporteAdmin(LocalDateTime desde, LocalDateTime hasta) {
         BigDecimal ingresosPorSuscripciones = pagoSuscripcionRepository
@@ -37,6 +55,15 @@ public class ReporteFinancieroService {
                 ingresosPorSuscripciones);
     }
 
+    /**
+     * Arma el DTO de reporte con totales y detalle por evento.
+     *
+     * @param desde                    inicio del período
+     * @param hasta                    fin del período
+     * @param detalle                  detalle por evento
+     * @param ingresosPorSuscripciones ingresos de suscripciones
+     * @return reporte financiero
+     */
     private ReporteFinancieroResponse construir(LocalDateTime desde, LocalDateTime hasta,
                                                 List<ReporteEventoItem> detalle, BigDecimal ingresosPorSuscripciones) {
         BigDecimal ingresosPorEventos = detalle.stream()
@@ -53,6 +80,12 @@ public class ReporteFinancieroService {
                 .build();
     }
 
+    /**
+     * Convierte filas agregadas del repositorio a ítems de reporte.
+     *
+     * @param filas filas de evento, inscritos, monto y comisión
+     * @return detalle por evento
+     */
     private List<ReporteEventoItem> mapFilas(List<Object[]> filas) {
         return filas.stream().map(fila -> {
             String eventoId = (String) fila[0];
@@ -68,6 +101,12 @@ public class ReporteFinancieroService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Normaliza un valor numérico a {@link BigDecimal}.
+     *
+     * @param value valor a convertir
+     * @return monto o cero si es nulo
+     */
     private BigDecimal toBigDecimal(Object value) {
         if (value instanceof BigDecimal bd) {
             return bd;

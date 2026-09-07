@@ -32,26 +32,54 @@ public class PlanService {
     private final FuncionalidadPlanRepository funcionalidadPlanRepository;
     private final HistorialPlanRepository historialPlanRepository;
 
+    /**
+     * Lista los planes activos del catálogo.
+     *
+     * @return planes activos
+     */
     @Transactional(readOnly = true)
     public List<PlanResponse> listarActivos() {
         return planRepository.findByActivoTrue().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Lista todos los planes, incluidos los inactivos.
+     *
+     * @return catálogo completo de planes
+     */
     @Transactional(readOnly = true)
     public List<PlanResponse> listarTodos() {
         return planRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Obtiene un plan por su identificador.
+     *
+     * @param id identificador del plan
+     * @return plan encontrado
+     */
     @Transactional(readOnly = true)
     public PlanResponse obtenerPorId(Long id) {
         return toResponse(obtenerEntidad(id));
     }
 
+    /**
+     * Obtiene la entidad de plan o lanza si no existe.
+     *
+     * @param id identificador del plan
+     * @return entidad persistida
+     */
     @Transactional(readOnly = true)
     public Plan obtenerEntidad(Long id) {
         return planRepository.findById(id).orElseThrow(() -> new PlanNotFoundException(id));
     }
 
+    /**
+     * Crea un plan activo con sus beneficios.
+     *
+     * @param request datos del plan
+     * @return plan creado
+     */
     @Transactional
     public PlanResponse crear(PlanRequest request) {
         Plan plan = new Plan();
@@ -63,11 +91,26 @@ public class PlanService {
         return toResponse(plan);
     }
 
+    /**
+     * Actualiza un plan sin registrar actor.
+     *
+     * @param id      identificador del plan
+     * @param request nuevos datos del plan
+     * @return plan actualizado
+     */
     @Transactional
     public PlanResponse actualizar(Long id, PlanRequest request) {
         return actualizar(id, request, null);
     }
 
+    /**
+     * Actualiza un plan, registra cambios y reemplaza beneficios.
+     *
+     * @param id      identificador del plan
+     * @param request nuevos datos del plan
+     * @param actorId usuario que realiza el cambio, o {@code null}
+     * @return plan actualizado
+     */
     @Transactional
     public PlanResponse actualizar(Long id, PlanRequest request, String actorId) {
         Plan plan = obtenerEntidad(id);
@@ -88,6 +131,12 @@ public class PlanService {
         return toResponse(plan);
     }
 
+    /**
+     * Desactiva un plan sin afectar ciclos vigentes.
+     *
+     * @param id identificador del plan
+     * @return plan desactivado
+     */
     @Transactional
     public PlanResponse desactivar(Long id) {
         Plan plan = obtenerEntidad(id);
@@ -97,6 +146,12 @@ public class PlanService {
         return toResponse(plan);
     }
 
+    /**
+     * Copia los campos del request sobre la entidad de plan.
+     *
+     * @param plan    entidad a actualizar
+     * @param request datos de entrada
+     */
     private void aplicarRequest(Plan plan, PlanRequest request) {
         plan.setNombre(request.getNombre());
         plan.setDescripcion(request.getDescripcion());
@@ -112,6 +167,15 @@ public class PlanService {
         }
     }
 
+    /**
+     * Registra un cambio de campo en el historial si el valor cambió.
+     *
+     * @param plan     plan modificado
+     * @param campo    nombre del campo
+     * @param anterior valor previo
+     * @param nuevo    valor nuevo
+     * @param actorId  usuario que realiza el cambio
+     */
     private void registrarCambio(Plan plan, String campo, String anterior, String nuevo, String actorId) {
         if (Objects.equals(anterior, nuevo)) {
             return;
@@ -125,6 +189,12 @@ public class PlanService {
         historialPlanRepository.save(h);
     }
 
+    /**
+     * Reemplaza los beneficios del plan en el orden recibido.
+     *
+     * @param plan       plan destino
+     * @param beneficios textos de beneficio
+     */
     private void guardarBeneficios(Plan plan, List<String> beneficios) {
         if (beneficios == null) {
             return;
@@ -142,6 +212,12 @@ public class PlanService {
         }
     }
 
+    /**
+     * Convierte el plan a DTO incluyendo beneficios y funcionalidades.
+     *
+     * @param plan entidad persistida
+     * @return DTO de respuesta
+     */
     private PlanResponse toResponse(Plan plan) {
         List<String> beneficios = beneficioPlanRepository.findByPlanIdOrderByOrdenAsc(plan.getId()).stream()
                 .map(BeneficioPlan::getBeneficio)

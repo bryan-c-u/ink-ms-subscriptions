@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.math.BigDecimal;
 
+/**
+ * Servicio de envío asíncrono de correos transaccionales.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -26,6 +29,11 @@ public class EmailService {
     @Value("${app.mail-enabled:false}")
     private boolean mailEnabled;
 
+    /**
+     * Indica si el envío de correo está deshabilitado.
+     *
+     * @return {@code true} si no se debe enviar correo
+     */
     private boolean correoDeshabilitado() {
         if (!mailEnabled || fromEmail == null || fromEmail.isBlank()) {
             log.debug("Correo deshabilitado; se omite el envio");
@@ -34,6 +42,15 @@ public class EmailService {
         return false;
     }
 
+    /**
+     * Envía el comprobante de pago al destinatario, con PDF adjunto si existe.
+     *
+     * @param to                 correo destino
+     * @param numeroComprobante  número del comprobante
+     * @param concepto           concepto del pago
+     * @param monto              monto pagado
+     * @param adjuntoPdf         PDF del comprobante, o {@code null}
+     */
     @Async
     public void enviarComprobantePago(String to, String numeroComprobante, String concepto,
                                       BigDecimal monto, File adjuntoPdf) {
@@ -57,6 +74,13 @@ public class EmailService {
         }
     }
 
+    /**
+     * Envía un aviso de vencimiento próximo de la suscripción.
+     *
+     * @param to            correo destino
+     * @param planNombre    nombre del plan
+     * @param diasRestantes días restantes de vigencia
+     */
     @Async
     public void enviarAvisoVencimiento(String to, String planNombre, int diasRestantes) {
         if (correoDeshabilitado() || to == null || !to.contains("@")) {
@@ -76,6 +100,14 @@ public class EmailService {
         }
     }
 
+    /**
+     * Construye el HTML del correo de comprobante.
+     *
+     * @param numeroComprobante número del comprobante
+     * @param concepto          concepto del pago
+     * @param monto             monto pagado
+     * @return cuerpo HTML
+     */
     private String buildComprobanteContent(String numeroComprobante, String concepto, BigDecimal monto) {
         return """
             <html><body style="font-family: Arial, sans-serif;">
@@ -88,6 +120,13 @@ public class EmailService {
             """.formatted(concepto, monto.toPlainString(), numeroComprobante);
     }
 
+    /**
+     * Construye el HTML del aviso de vencimiento.
+     *
+     * @param planNombre    nombre del plan
+     * @param diasRestantes días restantes de vigencia
+     * @return cuerpo HTML
+     */
     private String buildAvisoVencimientoContent(String planNombre, int diasRestantes) {
         return """
             <html><body style="font-family: Arial, sans-serif;">

@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+/**
+ * Servicio que procesa notificaciones de la pasarela de pago.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,6 +26,11 @@ public class PagoWebhookService {
     private final WebhookPasarelaRepository webhookPasarelaRepository;
     private final TransaccionPasarelaRepository transaccionPasarelaRepository;
 
+    /**
+     * Consulta el pago notificado y lo confirma según el prefijo de la referencia.
+     *
+     * @param paymentIdExterno identificador externo del pago en la pasarela
+     */
     @Transactional
     public void procesarNotificacion(String paymentIdExterno) {
         WebhookPasarela logWebhook = new WebhookPasarela();

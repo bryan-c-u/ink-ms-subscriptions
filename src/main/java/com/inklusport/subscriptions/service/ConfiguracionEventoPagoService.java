@@ -17,6 +17,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de configuración de cobro e inscripción de eventos.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,6 +28,13 @@ public class ConfiguracionEventoPagoService {
     private final ConfiguracionEventoPagoRepository configuracionEventoPagoRepository;
     private final SuscripcionRepository suscripcionRepository;
 
+    /**
+     * Crea la configuración de pago de un evento.
+     *
+     * @param organizadorId identificador del organizador
+     * @param request       datos de cobro e inscripción
+     * @return configuración creada
+     */
     @Transactional
     public ConfiguracionEventoPagoResponse configurar(String organizadorId, ConfiguracionEventoPagoRequest request) {
         if (configuracionEventoPagoRepository.existsByEventoId(request.getEventoId())) {
@@ -45,6 +55,14 @@ public class ConfiguracionEventoPagoService {
         return toResponse(config);
     }
 
+    /**
+     * Actualiza la configuración de pago de un evento propio.
+     *
+     * @param organizadorId identificador del organizador
+     * @param eventoId      identificador del evento
+     * @param request       nuevos datos de cobro
+     * @return configuración actualizada
+     */
     @Transactional
     public ConfiguracionEventoPagoResponse actualizar(String organizadorId, String eventoId,
                                                       ConfiguracionEventoPagoRequest request) {
@@ -60,17 +78,35 @@ public class ConfiguracionEventoPagoService {
         return toResponse(configuracionEventoPagoRepository.save(config));
     }
 
+    /**
+     * Obtiene la configuración de pago de un evento.
+     *
+     * @param eventoId identificador del evento
+     * @return configuración del evento
+     */
     @Transactional(readOnly = true)
     public ConfiguracionEventoPagoResponse obtenerPorEvento(String eventoId) {
         return toResponse(obtenerEntidadPorEvento(eventoId));
     }
 
+    /**
+     * Obtiene la entidad de configuración de un evento.
+     *
+     * @param eventoId identificador del evento
+     * @return entidad persistida
+     */
     @Transactional(readOnly = true)
     public ConfiguracionEventoPago obtenerEntidadPorEvento(String eventoId) {
         return configuracionEventoPagoRepository.findByEventoId(eventoId)
                 .orElseThrow(() -> new ConfiguracionEventoPagoNotFoundException(eventoId));
     }
 
+    /**
+     * Lista las configuraciones de pago de un organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @return configuraciones del organizador
+     */
     @Transactional(readOnly = true)
     public List<ConfiguracionEventoPagoResponse> listarPorOrganizador(String organizadorId) {
         return configuracionEventoPagoRepository.findByOrganizadorId(organizadorId).stream()
@@ -78,6 +114,13 @@ public class ConfiguracionEventoPagoService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Obtiene la configuración de un evento y valida que pertenezca al organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @param eventoId      identificador del evento
+     * @return configuración del organizador
+     */
     private ConfiguracionEventoPago obtenerPropia(String organizadorId, String eventoId) {
         ConfiguracionEventoPago config = obtenerEntidadPorEvento(eventoId);
         if (!config.getOrganizadorId().equals(organizadorId)) {
@@ -86,6 +129,12 @@ public class ConfiguracionEventoPagoService {
         return config;
     }
 
+    /**
+     * Calcula la comisión vigente según la suscripción activa del organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @return porcentaje de comisión o cero si no hay suscripción activa
+     */
     private BigDecimal comisionVigente(String organizadorId) {
         return suscripcionRepository
                 .findFirstByOrganizadorIdAndEstadoOrderByFechaCreacionDesc(organizadorId, EstadoSuscripcion.ACTIVA)
@@ -95,6 +144,12 @@ public class ConfiguracionEventoPagoService {
                 .orElse(BigDecimal.ZERO);
     }
 
+    /**
+     * Convierte la entidad a DTO de respuesta.
+     *
+     * @param config configuración persistida
+     * @return DTO de respuesta
+     */
     private ConfiguracionEventoPagoResponse toResponse(ConfiguracionEventoPago config) {
         return ConfiguracionEventoPagoResponse.builder()
                 .id(config.getId())

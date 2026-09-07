@@ -24,6 +24,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de ciclo de vida de suscripciones del organizador.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -35,6 +38,13 @@ public class SuscripcionService {
     private final PlanService planService;
     private final PagoSuscripcionService pagoSuscripcionService;
 
+    /**
+     * Crea una solicitud de suscripción y arranca el cobro del plan.
+     *
+     * @param organizadorId identificador del organizador
+     * @param request       plan y opciones de renovación
+     * @return datos de checkout del pago
+     */
     @Transactional
     public PagoCheckoutResponse crearSolicitud(String organizadorId, CrearSuscripcionRequest request) {
         Plan plan = planService.obtenerEntidad(request.getPlanId());
@@ -64,6 +74,14 @@ public class SuscripcionService {
         return pagoSuscripcionService.iniciarPago(suscripcion, plan);
     }
 
+    /**
+     * Renueva o cambia el plan de una suscripción propia.
+     *
+     * @param organizadorId identificador del organizador
+     * @param suscripcionId identificador de la suscripción
+     * @param request       plan destino, o el actual si no se indica
+     * @return datos de checkout del pago
+     */
     @Transactional
     public PagoCheckoutResponse renovar(String organizadorId, Long suscripcionId, RenovarSuscripcionRequest request) {
         Suscripcion suscripcion = obtenerPropia(organizadorId, suscripcionId);
@@ -77,6 +95,12 @@ public class SuscripcionService {
         return pagoSuscripcionService.iniciarPago(suscripcion, plan);
     }
 
+    /**
+     * Obtiene la suscripción más reciente del organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @return suscripción actual
+     */
     @Transactional(readOnly = true)
     public SuscripcionResponse obtenerActual(String organizadorId) {
         Suscripcion suscripcion = suscripcionRepository.findFirstByOrganizadorIdOrderByFechaCreacionDesc(organizadorId)
@@ -84,6 +108,12 @@ public class SuscripcionService {
         return toResponse(suscripcion);
     }
 
+    /**
+     * Lista las suscripciones del organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @return suscripciones propias
+     */
     @Transactional(readOnly = true)
     public List<SuscripcionResponse> listarPropias(String organizadorId) {
         return suscripcionRepository.findByOrganizadorIdOrderByFechaCreacionDesc(organizadorId).stream()
@@ -91,6 +121,13 @@ public class SuscripcionService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lista el historial de una suscripción propia.
+     *
+     * @param organizadorId identificador del organizador
+     * @param suscripcionId identificador de la suscripción
+     * @return movimientos de la suscripción
+     */
     @Transactional(readOnly = true)
     public List<HistorialSuscripcionResponse> historialPropio(String organizadorId, Long suscripcionId) {
         obtenerPropia(organizadorId, suscripcionId);
@@ -99,12 +136,25 @@ public class SuscripcionService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lista el historial de todas las suscripciones de un organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @return movimientos del organizador
+     */
     @Transactional(readOnly = true)
     public List<HistorialSuscripcionResponse> historialPorOrganizador(String organizadorId) {
         return historialSuscripcionRepository.findBySuscripcion_OrganizadorIdOrderByFechaMovimientoDesc(organizadorId)
                 .stream().map(this::toHistorialResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Cambia el estado de una suscripción y registra el movimiento.
+     *
+     * @param suscripcionId identificador de la suscripción
+     * @param nuevoEstado   estado destino
+     * @return suscripción actualizada
+     */
     @Transactional
     public SuscripcionResponse cambiarEstado(Long suscripcionId, EstadoSuscripcion nuevoEstado) {
         Suscripcion suscripcion = obtenerEntidad(suscripcionId);
@@ -121,6 +171,12 @@ public class SuscripcionService {
         return toResponse(suscripcion);
     }
 
+    /**
+     * Indica si el organizador puede crear un evento según su cupo mensual.
+     *
+     * @param organizadorId identificador del organizador
+     * @return cupo, límite y si puede crear
+     */
     @Transactional(readOnly = true)
     public PuedeCrearEventoResponse puedeCrearEvento(String organizadorId) {
         return suscripcionRepository
@@ -142,6 +198,11 @@ public class SuscripcionService {
                         .build());
     }
 
+    /**
+     * Consume un cupo de evento del período si la suscripción lo permite.
+     *
+     * @param organizadorId identificador del organizador
+     */
     @Transactional
     public void registrarEventoCreado(String organizadorId) {
         Suscripcion suscripcion = suscripcionRepository
@@ -155,6 +216,12 @@ public class SuscripcionService {
         suscripcionRepository.incrementarEventosCreados(suscripcion.getId());
     }
 
+    /**
+     * Asigna el plan gratuito inicial si el organizador aún no tiene suscripción.
+     *
+     * @param organizadorId identificador del organizador
+     * @return suscripción existente o la asignada
+     */
     @Transactional
     public SuscripcionResponse asignarPlanGratuito(String organizadorId) {
         var existente = suscripcionRepository.findFirstByOrganizadorIdOrderByFechaCreacionDesc(organizadorId);
@@ -184,12 +251,25 @@ public class SuscripcionService {
         return toResponse(suscripcion);
     }
 
+    /**
+     * Obtiene la entidad de suscripción o lanza si no existe.
+     *
+     * @param suscripcionId identificador de la suscripción
+     * @return entidad persistida
+     */
     @Transactional(readOnly = true)
     public Suscripcion obtenerEntidad(Long suscripcionId) {
         return suscripcionRepository.findById(suscripcionId)
                 .orElseThrow(() -> new SuscripcionNotFoundException(suscripcionId));
     }
 
+    /**
+     * Obtiene una suscripción y valida que pertenezca al organizador.
+     *
+     * @param organizadorId identificador del organizador
+     * @param suscripcionId identificador de la suscripción
+     * @return suscripción propia
+     */
     @Transactional(readOnly = true)
     public Suscripcion obtenerPropia(String organizadorId, Long suscripcionId) {
         Suscripcion suscripcion = obtenerEntidad(suscripcionId);
@@ -199,6 +279,11 @@ public class SuscripcionService {
         return suscripcion;
     }
 
+    /**
+     * Reinicia el contador mensual si el período ya no corresponde al mes actual.
+     *
+     * @param s suscripción a revisar
+     */
     private void resetPeriodoSiCorresponde(Suscripcion s) {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         if (s.getPeriodoInicio() == null || s.getPeriodoInicio().isBefore(inicioMes)) {
@@ -208,6 +293,15 @@ public class SuscripcionService {
         }
     }
 
+    /**
+     * Persiste un movimiento en el historial de la suscripción.
+     *
+     * @param suscripcion    suscripción afectada
+     * @param tipo           tipo de movimiento
+     * @param anterior       estado previo
+     * @param nuevo          estado nuevo
+     * @param planAnteriorId plan anterior, o {@code null}
+     */
     private void registrarHistorial(Suscripcion suscripcion, TipoMovimiento tipo,
                                     EstadoSuscripcion anterior, EstadoSuscripcion nuevo, Long planAnteriorId) {
         HistorialSuscripcion h = new HistorialSuscripcion();
@@ -221,6 +315,12 @@ public class SuscripcionService {
         historialSuscripcionRepository.save(h);
     }
 
+    /**
+     * Traduce un estado de suscripción al tipo de movimiento de historial.
+     *
+     * @param estado estado destino
+     * @return tipo de movimiento
+     */
     private TipoMovimiento mapEstadoAMovimiento(EstadoSuscripcion estado) {
         return switch (estado) {
             case CANCELADA -> TipoMovimiento.CANCELACION;
@@ -230,6 +330,12 @@ public class SuscripcionService {
         };
     }
 
+    /**
+     * Convierte la suscripción a DTO de respuesta.
+     *
+     * @param s entidad persistida
+     * @return DTO de respuesta
+     */
     private SuscripcionResponse toResponse(Suscripcion s) {
         return SuscripcionResponse.builder()
                 .id(s.getId())
@@ -249,6 +355,12 @@ public class SuscripcionService {
                 .build();
     }
 
+    /**
+     * Convierte un movimiento de historial a DTO de respuesta.
+     *
+     * @param h movimiento persistido
+     * @return DTO de historial
+     */
     private HistorialSuscripcionResponse toHistorialResponse(HistorialSuscripcion h) {
         return HistorialSuscripcionResponse.builder()
                 .id(h.getId())
@@ -262,6 +374,12 @@ public class SuscripcionService {
                 .build();
     }
 
+    /**
+     * Resuelve el nombre de un plan por su identificador.
+     *
+     * @param planId identificador del plan
+     * @return nombre del plan, o {@code null} si no existe
+     */
     private String nombrePlan(Long planId) {
         if (planId == null) {
             return null;

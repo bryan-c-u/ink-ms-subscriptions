@@ -35,6 +35,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de pagos y activación de suscripciones.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -55,6 +58,13 @@ public class PagoSuscripcionService {
     @Value("${app.payment.mode:mock}")
     private String paymentMode;
 
+    /**
+     * Inicia el cobro de una suscripción o la activa si el plan es gratuito.
+     *
+     * @param suscripcion suscripción a cobrar
+     * @param planAplicar plan que se va a aplicar
+     * @return datos de checkout del pago
+     */
     @Transactional
     public PagoCheckoutResponse iniciarPago(Suscripcion suscripcion, Plan planAplicar) {
         if (planAplicar.getPrecio().compareTo(BigDecimal.ZERO) == 0) {
@@ -112,6 +122,11 @@ public class PagoSuscripcionService {
                 .build();
     }
 
+    /**
+     * Confirma el estado de un pago de suscripción según la pasarela.
+     *
+     * @param status resultado consultado en la pasarela
+     */
     @Transactional
     public void confirmarPago(PaymentStatusResult status) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(status.getReferenciaExterna())
@@ -160,6 +175,13 @@ public class PagoSuscripcionService {
         }
     }
 
+    /**
+     * Activa la suscripción aplicando el plan y registra el movimiento en historial.
+     *
+     * @param suscripcion suscripción a activar
+     * @param plan        plan a aplicar
+     * @return suscripción actualizada
+     */
     @Transactional
     public Suscripcion activarSuscripcion(Suscripcion suscripcion, Plan plan) {
         LocalDate hoy = LocalDate.now();
@@ -205,6 +227,12 @@ public class PagoSuscripcionService {
         return suscripcion;
     }
 
+    /**
+     * Lista los pagos asociados a una suscripción.
+     *
+     * @param suscripcionId identificador de la suscripción
+     * @return pagos ordenados por fecha descendente
+     */
     @Transactional(readOnly = true)
     public List<PagoSuscripcionResponse> listarPorSuscripcion(Long suscripcionId) {
         return pagoSuscripcionRepository.findBySuscripcionIdOrderByFechaPagoDesc(suscripcionId).stream()
@@ -212,6 +240,13 @@ public class PagoSuscripcionService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Determina si el pago es de alta, cambio de plan o renovación.
+     *
+     * @param suscripcion suscripción involucrada
+     * @param plan        plan a cobrar
+     * @return tipo de pago
+     */
     private TipoPagoSuscripcion resolverTipo(Suscripcion suscripcion, Plan plan) {
         boolean primeraVez = historialSuscripcionRepository
                 .findBySuscripcionIdOrderByFechaMovimientoDesc(suscripcion.getId()).isEmpty();
@@ -224,15 +259,32 @@ public class PagoSuscripcionService {
         return TipoPagoSuscripcion.RENOVACION;
     }
 
+    /**
+     * Indica si la pasarela está en modo simulado.
+     *
+     * @return {@code true} si el modo de pago es mock
+     */
     private boolean esMock() {
         return "mock".equalsIgnoreCase(paymentMode);
     }
 
+    /**
+     * Extrae el identificador de plan embebido en la referencia.
+     *
+     * @param referencia referencia externa del pago
+     * @return identificador del plan
+     */
     private Long extraerPlanId(String referencia) {
         String[] partes = referencia.split("-");
         return Long.parseLong(partes[partes.length - 1]);
     }
 
+    /**
+     * Convierte el pago de suscripción a DTO de respuesta.
+     *
+     * @param pago pago persistido
+     * @return DTO de respuesta
+     */
     private PagoSuscripcionResponse toResponse(PagoSuscripcion pago) {
         var comprobante = comprobantePagoRepository.findByPagoSuscripcionId(pago.getId()).orElse(null);
         return PagoSuscripcionResponse.builder()

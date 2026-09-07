@@ -29,6 +29,9 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de pagos e inscripciones a eventos.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -47,6 +50,13 @@ public class PagoEventoService {
     @Value("${app.payment.mode:mock}")
     private String paymentMode;
 
+    /**
+     * Inicia la inscripción de pago a un evento y crea el checkout.
+     *
+     * @param usuarioId identificador del usuario
+     * @param eventoId  identificador del evento
+     * @return datos de checkout del pago
+     */
     @Transactional
     public PagoCheckoutResponse inscribirse(String usuarioId, String eventoId) {
         ConfiguracionEventoPago config = configuracionEventoPagoService.obtenerEntidadPorEvento(eventoId);
@@ -107,6 +117,11 @@ public class PagoEventoService {
                 .build();
     }
 
+    /**
+     * Confirma el estado de un pago de evento según la pasarela.
+     *
+     * @param status resultado consultado en la pasarela
+     */
     @Transactional
     public void confirmarPago(PaymentStatusResult status) {
         PagoEvento pago = pagoEventoRepository.findByReferenciaTransaccion(status.getReferenciaExterna())
@@ -143,6 +158,12 @@ public class PagoEventoService {
         }
     }
 
+    /**
+     * Lista el historial de pagos de evento de un usuario.
+     *
+     * @param usuarioId identificador del usuario
+     * @return pagos ordenados por fecha descendente
+     */
     @Transactional(readOnly = true)
     public List<PagoEventoResponse> historialUsuario(String usuarioId) {
         return pagoEventoRepository.findByUsuarioIdOrderByFechaPagoDesc(usuarioId).stream()
@@ -150,6 +171,14 @@ public class PagoEventoService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Obtiene el PDF del comprobante de un pago de evento.
+     *
+     * @param pagoId      identificador del pago
+     * @param requesterId usuario que solicita el archivo
+     * @param esAdmin     {@code true} si el solicitante es administrador
+     * @return archivo PDF del comprobante
+     */
     @Transactional(readOnly = true)
     public java.io.File obtenerComprobante(Long pagoId, String requesterId, boolean esAdmin) {
         PagoEvento pago = pagoEventoRepository.findById(pagoId)
@@ -166,6 +195,12 @@ public class PagoEventoService {
         return archivo;
     }
 
+    /**
+     * Convierte el pago de evento a DTO de respuesta.
+     *
+     * @param pago pago persistido
+     * @return DTO de respuesta
+     */
     private PagoEventoResponse toResponse(PagoEvento pago) {
         var comprobante = comprobantePagoRepository.findByPagoEventoId(pago.getId()).orElse(null);
         return PagoEventoResponse.builder()

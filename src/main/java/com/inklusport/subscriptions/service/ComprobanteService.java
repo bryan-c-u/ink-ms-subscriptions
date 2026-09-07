@@ -23,6 +23,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Servicio de generación y almacenamiento de comprobantes de pago.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,6 +36,13 @@ public class ComprobanteService {
     @Value("${app.comprobantes.storage-path:./comprobantes}")
     private String storagePath;
 
+    /**
+     * Genera el comprobante de un pago de inscripción a evento.
+     *
+     * @param pagoEvento pago de evento asociado
+     * @param concepto   descripción del cobro
+     * @return comprobante persistido
+     */
     @Transactional
     public ComprobantePago generarComprobanteEvento(PagoEvento pagoEvento, String concepto) {
         return generar(pagoEvento, null, TipoComprobante.INSCRIPCION, concepto, pagoEvento.getMonto(),
@@ -40,6 +50,13 @@ public class ComprobanteService {
                 pagoEvento.getUsuarioId());
     }
 
+    /**
+     * Genera el comprobante de un pago de suscripción.
+     *
+     * @param pagoSuscripcion pago de suscripción asociado
+     * @param concepto        descripción del cobro
+     * @return comprobante persistido
+     */
     @Transactional
     public ComprobantePago generarComprobanteSuscripcion(PagoSuscripcion pagoSuscripcion, String concepto) {
         return generar(null, pagoSuscripcion, TipoComprobante.SUSCRIPCION, concepto, pagoSuscripcion.getMonto(),
@@ -47,11 +64,31 @@ public class ComprobanteService {
                 pagoSuscripcion.getSuscripcion().getOrganizadorId());
     }
 
+    /**
+     * Obtiene el archivo PDF del comprobante, si existe.
+     *
+     * @param comprobante comprobante con la ruta del PDF
+     * @return archivo o {@code null} si no hay ruta
+     */
     public File obtenerArchivo(ComprobantePago comprobante) {
         String ruta = comprobante.getUrlPdf();
         return (ruta != null && !ruta.isBlank()) ? new File(ruta) : null;
     }
 
+    /**
+     * Crea el PDF, arma la entidad y la guarda.
+     *
+     * @param pagoEvento      pago de evento, o {@code null}
+     * @param pagoSuscripcion pago de suscripción, o {@code null}
+     * @param tipo            tipo de comprobante
+     * @param concepto        descripción del cobro
+     * @param monto           monto pagado
+     * @param moneda          moneda del pago
+     * @param referencia      referencia de la transacción
+     * @param fechaPago       fecha del pago
+     * @param emailDestino    destinatario del comprobante
+     * @return comprobante persistido
+     */
     private ComprobantePago generar(PagoEvento pagoEvento, PagoSuscripcion pagoSuscripcion, TipoComprobante tipo,
                                     String concepto, BigDecimal monto, String moneda, String referencia,
                                     LocalDateTime fechaPago, String emailDestino) {
@@ -74,6 +111,17 @@ public class ComprobanteService {
         return comprobantePagoRepository.save(comprobante);
     }
 
+    /**
+     * Genera el PDF del comprobante en el directorio de almacenamiento.
+     *
+     * @param numero    número de comprobante
+     * @param concepto  descripción del cobro
+     * @param monto     monto pagado
+     * @param moneda    moneda del pago
+     * @param referencia referencia de la transacción
+     * @param fechaPago fecha del pago
+     * @return archivo PDF o {@code null} si falla la generación
+     */
     private File generarPdf(String numero, String concepto, BigDecimal monto, String moneda, String referencia,
                             LocalDateTime fechaPago) {
         try {
