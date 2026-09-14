@@ -1,6 +1,7 @@
 package com.inklusport.subscriptions.controller;
 
 import com.inklusport.subscriptions.dto.ReporteFinancieroResponse;
+import com.inklusport.subscriptions.service.OrganizerIdentityService;
 import com.inklusport.subscriptions.service.ReporteFinancieroService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,14 +20,15 @@ import java.time.LocalTime;
 public class ReporteFinancieroController {
 
     private final ReporteFinancieroService reporteFinancieroService;
+    private final OrganizerIdentityService organizerIdentityService;
 
     @GetMapping("/api/reportes/financiero")
     public ResponseEntity<ReporteFinancieroResponse> reportePropio(
-            @AuthenticationPrincipal String email,
+            @AuthenticationPrincipal String principal,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
         LocalDateTime[] rango = normalizarRango(desde, hasta);
-        return ResponseEntity.ok(reporteFinancieroService.reporteOrganizador(email, rango[0], rango[1]));
+        return ResponseEntity.ok(reporteFinancieroService.reporteOrganizador(organizerIdentityService.resolveUserId(principal), rango[0], rango[1]));
     }
 
     // /api/reportes/admin (no /api/admin/reportes): /api/admin/** ya esta reservado

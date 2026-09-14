@@ -9,6 +9,7 @@ import com.inklusport.subscriptions.repository.HistorialSuscripcionRepository;
 import com.inklusport.subscriptions.repository.NotificacionVencimientoRepository;
 import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import com.inklusport.subscriptions.service.EmailService;
+import com.inklusport.subscriptions.service.OrganizerIdentityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ public class SuscripcionScheduler {
     private final HistorialSuscripcionRepository historialSuscripcionRepository;
     private final NotificacionVencimientoRepository notificacionVencimientoRepository;
     private final EmailService emailService;
+    private final OrganizerIdentityService organizerIdentityService;
 
     @Value("${app.suscripciones.dias-aviso-vencimiento:7}")
     private String diasAvisoVencimiento;
@@ -86,9 +88,10 @@ public class SuscripcionScheduler {
             n.setSuscripcion(suscripcion);
             n.setDiasAntes((int) diasRestantes);
             n.setFechaProgramada(hoy);
-            n.setDestinatario(suscripcion.getOrganizadorId());
+            n.setDestinatario(organizerIdentityService.resolveEmail(suscripcion.getOrganizadorId()));
             try {
-                emailService.enviarAvisoVencimiento(suscripcion.getOrganizadorId(),
+                emailService.enviarAvisoVencimiento(
+                        organizerIdentityService.resolveEmail(suscripcion.getOrganizadorId()),
                         suscripcion.getPlan().getNombre(), (int) diasRestantes);
                 n.setEstado("ENVIADA");
                 n.setFechaEnvio(LocalDateTime.now());

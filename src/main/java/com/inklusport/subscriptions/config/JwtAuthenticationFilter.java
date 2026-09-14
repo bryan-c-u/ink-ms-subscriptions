@@ -45,6 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (token != null && jwtTokenProvider.validateToken(token)) {
             String email = jwtTokenProvider.getEmailFromToken(token);
+            String userId = jwtTokenProvider.getUserIdFromToken(token);
             List<String> roles = jwtTokenProvider.getRolesFromToken(token);
 
             if (roles == null) {
@@ -55,11 +56,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .map(this::toAuthority)
                     .collect(Collectors.toList());
 
+            String principal = (userId != null && !userId.isBlank()) ? userId : email;
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(email, null, authorities);
+                    new UsernamePasswordAuthenticationToken(principal, null, authorities);
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.info("Usuario autenticado: {} con roles: {}", email, roles);
+            log.info("Usuario autenticado: {} con roles: {}", principal, roles);
         }
 
         filterChain.doFilter(request, response);

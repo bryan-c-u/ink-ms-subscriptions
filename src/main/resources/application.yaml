@@ -8,7 +8,8 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:validate}
+      # El esquema lo crea init-mysql; validate choca CHAR/ENUM de MySQL con el mapeo JPA.
+      ddl-auto: ${JPA_DDL_AUTO:none}
     show-sql: ${SHOW_SQL:false}
     open-in-view: false
     properties:
@@ -37,6 +38,14 @@ jwt:
 auth:
   service:
     url: ${AUTH_SERVICE_URL:http://localhost:3001}
+
+users:
+  service:
+    url: ${USERS_SERVICE_URL:http://localhost:3002}
+
+sports:
+  service:
+    url: ${SPORTS_SERVICE_URL:http://localhost:3003}
 
 app:
   mail-enabled: ${MAIL_ENABLED:false}
@@ -77,6 +86,9 @@ spring:
       on-profile: docker
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://mysql:3306/inklusport_subscriptions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:none}
 
 ---
 spring:

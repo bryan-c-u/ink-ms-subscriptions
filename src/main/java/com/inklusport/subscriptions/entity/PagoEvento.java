@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,12 +26,14 @@ public class PagoEvento {
     @Column(name = "usuario_id", nullable = false, length = 100)
     private String usuarioId;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "evento_id", nullable = false, length = 36)
     private String eventoId;
 
     @Column(name = "organizador_id", nullable = false, length = 100)
     private String organizadorId;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "inscripcion_id", length = 36)
     private String inscripcionId;
 
@@ -43,6 +47,7 @@ public class PagoEvento {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal monto;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(nullable = false, length = 3)
     private String moneda = "COP";
 

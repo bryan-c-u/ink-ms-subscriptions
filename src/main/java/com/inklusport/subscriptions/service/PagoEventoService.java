@@ -1,5 +1,6 @@
 package com.inklusport.subscriptions.service;
 
+import com.inklusport.subscriptions.client.SportsServiceClient;
 import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
 import com.inklusport.subscriptions.dto.PagoEventoResponse;
 import com.inklusport.subscriptions.entity.ComprobantePago;
@@ -46,6 +47,8 @@ public class PagoEventoService {
     private final PaymentGatewayClient paymentGatewayClient;
     private final ComprobanteService comprobanteService;
     private final EmailService emailService;
+    private final SportsServiceClient sportsServiceClient;
+    private final OrganizerIdentityService organizerIdentityService;
 
     @Value("${app.payment.mode:mock}")
     private String paymentMode;
@@ -147,10 +150,13 @@ public class PagoEventoService {
         pagoEventoRepository.save(pago);
 
         if (status.getEstado() == EstadoPago.APROBADO) {
+            sportsServiceClient.confirmarInscripcionPagada(pago.getUsuarioId(), pago.getEventoId());
             try {
                 ComprobantePago comprobante = comprobanteService.generarComprobanteEvento(
                         pago, "Inscripcion a evento " + pago.getEventoId());
-                emailService.enviarComprobantePago(pago.getUsuarioId(), comprobante.getNumeroComprobante(),
+                emailService.enviarComprobantePago(
+                        organizerIdentityService.resolveEmail(pago.getUsuarioId()),
+                        comprobante.getNumeroComprobante(),
                         "Inscripcion a evento", pago.getMonto(), comprobanteService.obtenerArchivo(comprobante));
             } catch (Exception e) {
                 log.error("Pago evento {} aprobado pero fallo el comprobante: {}", pago.getId(), e.getMessage(), e);

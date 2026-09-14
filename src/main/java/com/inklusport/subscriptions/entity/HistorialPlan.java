@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -32,6 +34,7 @@ public class HistorialPlan {
     @Column(name = "valor_nuevo", columnDefinition = "TEXT")
     private String valorNuevo;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "modificado_por", length = 36)
     private String modificadoPor;
 

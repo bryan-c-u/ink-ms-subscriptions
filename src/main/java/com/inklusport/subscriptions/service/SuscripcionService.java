@@ -97,15 +97,17 @@ public class SuscripcionService {
 
     /**
      * Obtiene la suscripción más reciente del organizador.
+     * Si todavía no tiene ninguna (rol asignado antes de cablear RF64),
+     * se le asigna el plan gratuito inicial.
      *
      * @param organizadorId identificador del organizador
      * @return suscripción actual
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public SuscripcionResponse obtenerActual(String organizadorId) {
-        Suscripcion suscripcion = suscripcionRepository.findFirstByOrganizadorIdOrderByFechaCreacionDesc(organizadorId)
-                .orElseThrow(() -> new SuscripcionNotFoundException("El organizador aun no tiene ninguna suscripcion"));
-        return toResponse(suscripcion);
+        return suscripcionRepository.findFirstByOrganizadorIdOrderByFechaCreacionDesc(organizadorId)
+                .map(this::toResponse)
+                .orElseGet(() -> asignarPlanGratuito(organizadorId));
     }
 
     /**

@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,6 +34,7 @@ public class Plan {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal precio = BigDecimal.ZERO;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
@@ -61,9 +64,11 @@ public class Plan {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "creado_por", length = 36)
     private String creadoPor;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "actualizado_por", length = 36)
     private String actualizadoPor;
 
