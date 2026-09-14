@@ -86,10 +86,10 @@ public class PagoSuscripcionService {
 
         String referencia = PREFIJO_REFERENCIA + pago.getId() + "-" + planAplicar.getId();
         pago.setReferenciaTransaccion(referencia);
+        pagoSuscripcionRepository.save(pago);
 
-        // Checkout propio (no Checkout Pro de Mercado Pago): el cobro real ocurre en
-        // pagarConTarjeta() cuando el usuario completa el formulario de tarjeta en
-        // nuestra propia vista. Por eso no se crea preferencia ni hay checkoutUrl.
+        // Checkout propio (SDK JS de Mercado Pago): el cobro ocurre en
+        // pagarConTarjeta() cuando el usuario completa el formulario embebido.
         return PagoCheckoutResponse.builder()
                 .pagoId(pago.getId())
                 .monto(pago.getMonto())
@@ -106,29 +106,31 @@ public class PagoSuscripcionService {
      * que si la confirmacion viniera del webhook.
      */
     @Transactional
-    public PagoEstadoResponse pagarConTarjeta(String email, String referencia, PagoTarjetaRequest datos,
+    public PagoEstadoResponse pagarConTarjeta(String principal, String referencia, PagoTarjetaRequest datos,
                                                boolean esAdmin) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
                 .orElseThrow(() -> new PagoNotFoundException(
                         "No se encontro el pago de suscripcion con referencia: " + referencia));
 
-        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(email)) {
+        String organizadorId = organizerIdentityService.resolveUserId(principal);
+        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(organizadorId)) {
             throw new AccessDeniedException("No tienes acceso a este pago");
         }
 
         if (pago.getEstado() == EstadoPago.PENDIENTE) {
             Long planId = extraerPlanId(referencia);
             Plan plan = planRepository.findById(planId).orElseThrow(() -> new PlanNotFoundException(planId));
+            String payerEmail = organizerIdentityService.resolveEmail(principal);
 
             PaymentStatusResult status = paymentGatewayClient.procesarPago(
                     datos.getCardToken(), pago.getMonto(), referencia,
                     "Suscripcion InkluSport - " + plan.getNombre(), datos.getInstallments(),
-                    datos.getPaymentMethodId(), email, datos.getDocType(), datos.getDocNumber());
+                    datos.getPaymentMethodId(), payerEmail, datos.getDocType(), datos.getDocNumber());
 
             confirmarPago(status);
         }
 
-        return estadoActual(email, referencia, esAdmin);
+        return estadoActual(principal, referencia, esAdmin);
     }
 
     /**
@@ -246,12 +248,13 @@ public class PagoSuscripcionService {
      * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
      */
     @Transactional(readOnly = true)
-    public PagoEstadoResponse estadoActual(String email, String referencia, boolean esAdmin) {
+    public PagoEstadoResponse estadoActual(String principal, String referencia, boolean esAdmin) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
                 .orElseThrow(() -> new PagoNotFoundException(
                         "No se encontro el pago de suscripcion con referencia: " + referencia));
         Suscripcion suscripcion = pago.getSuscripcion();
-        if (!esAdmin && !suscripcion.getOrganizadorId().equals(email)) {
+        String organizadorId = organizerIdentityService.resolveUserId(principal);
+        if (!esAdmin && !suscripcion.getOrganizadorId().equals(organizadorId)) {
             throw new AccessDeniedException("No tienes acceso a este pago");
         }
         return PagoEstadoResponse.builder()
