@@ -27,7 +27,7 @@ public class UsersServiceClient {
             return null;
         }
         try {
-            String url = UriComponentsBuilder.fromHttpUrl(usersServiceUrl + "/api/internal/users/id-by-email")
+            String url = UriComponentsBuilder.fromUriString(usersServiceUrl + "/api/internal/users/id-by-email")
                     .queryParam("email", email)
                     .toUriString();
             Map<String, String> body = restTemplate.exchange(

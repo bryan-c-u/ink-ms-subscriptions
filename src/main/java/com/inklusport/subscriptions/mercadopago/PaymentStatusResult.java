@@ -1,4 +1,4 @@
-package com.inklusport.subscriptions.payment;
+package com.inklusport.subscriptions.mercadopago;
 
 import com.inklusport.subscriptions.enums.EstadoPago;
 import lombok.AllArgsConstructor;

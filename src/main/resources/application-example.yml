@@ -1,0 +1,76 @@
+# Este archivo es un template/ejemplo de como configurar la aplicacion.
+# NUNCA commits credenciales reales. Usa variables de entorno o archivos .env.
+
+spring:
+  application:
+    name: ink-ms-subscriptions
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format-sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: 3005
+  servlet:
+    context-path: /api
+
+jwt:
+  secret: ${JWT_SECRET:cambiar-esta-clave-en-produccion}
+  expiration: 86400000
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://localhost:3001}
+
+# Credenciales de sandbox/produccion de Mercado Pago (RF70):
+# https://www.mercadopago.com.co/developers/panel/app
+mercadopago:
+  access-token: ${MP_ACCESS_TOKEN:}
+  public-key: ${MP_PUBLIC_KEY:}
+  # "Clave secreta" del panel de MP (Webhooks). Si se deja vacia, la firma del webhook no se valida.
+  webhook-secret: ${MP_WEBHOOK_SECRET:}
+
+app:
+  comprobantes:
+    storage-path: ${COMPROBANTES_STORAGE_PATH:./comprobantes}
+  suscripciones:
+    dias-aviso-vencimiento: ${DIAS_AVISO_VENCIMIENTO:5}
+  mercadopago:
+    currency: ${MP_CURRENCY:COP}
+    back-url-success: ${MP_BACK_URL_SUCCESS:http://localhost:4200/pagos/exito}
+    back-url-pending: ${MP_BACK_URL_PENDING:http://localhost:4200/pagos/pendiente}
+    back-url-failure: ${MP_BACK_URL_FAILURE:http://localhost:4200/pagos/error}
+    notification-url: ${MP_NOTIFICATION_URL:http://localhost:3005/api/pagos/mercadopago/webhook}
+
+mail:
+  host: ${MAIL_HOST:smtp.gmail.com}
+  port: ${MAIL_PORT:465}
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  protocol: smtps
+  properties:
+    mail:
+      smtp:
+        auth: true
+        ssl:
+          enable: true
+        starttls:
+          enable: false
+        socketFactory:
+          port: 465
+          class: javax.net.ssl.SSLSocketFactory
+
+logging:
+  level:
+    com.inklusport.subscriptions: DEBUG

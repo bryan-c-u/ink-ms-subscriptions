@@ -1,4 +1,4 @@
-package com.inklusport.subscriptions.payment;
+package com.inklusport.subscriptions.mercadopago;
 
 import com.inklusport.subscriptions.enums.EstadoPago;
 import com.inklusport.subscriptions.service.PaymentGatewayClient;
@@ -43,6 +43,25 @@ public class MockPaymentGatewayClient implements PaymentGatewayClient {
                 .detalleEstado("accredited")
                 .metodoPago("mock")
                 .tipoPago("account_money")
+                .build();
+    }
+
+    @Override
+    public PaymentStatusResult procesarPago(String cardToken, BigDecimal monto, String referenciaExterna,
+                                             String descripcion, Integer cuotas, String paymentMethodId,
+                                             String payerEmail, String docType, String docNumber) {
+        String paymentId = "MOCK-PAY-" + UUID.randomUUID();
+        paymentIdToReferencia.put(paymentId, referenciaExterna);
+        log.info("Mock cobro con tarjeta: monto={}, ref={}, paymentId={}", monto, referenciaExterna, paymentId);
+        return PaymentStatusResult.builder()
+                .paymentIdExterno(paymentId)
+                .referenciaExterna(referenciaExterna)
+                .estado(EstadoPago.APROBADO)
+                .estadoPasarela("approved")
+                .detalleEstado("accredited")
+                .montoPagado(monto)
+                .metodoPago(paymentMethodId)
+                .tipoPago("credit_card")
                 .build();
     }
 }

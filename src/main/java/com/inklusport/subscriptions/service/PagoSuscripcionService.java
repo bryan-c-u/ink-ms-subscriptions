@@ -1,7 +1,9 @@
 package com.inklusport.subscriptions.service;
 
 import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
+import com.inklusport.subscriptions.dto.PagoEstadoResponse;
 import com.inklusport.subscriptions.dto.PagoSuscripcionResponse;
+import com.inklusport.subscriptions.dto.PagoTarjetaRequest;
 import com.inklusport.subscriptions.entity.HistorialSuscripcion;
 import com.inklusport.subscriptions.entity.PagoSuscripcion;
 import com.inklusport.subscriptions.entity.Plan;
@@ -10,14 +12,11 @@ import com.inklusport.subscriptions.entity.TransaccionPasarela;
 import com.inklusport.subscriptions.enums.EstadoPago;
 import com.inklusport.subscriptions.enums.EstadoSuscripcion;
 import com.inklusport.subscriptions.enums.OrigenSuscripcion;
-import com.inklusport.subscriptions.enums.Pasarela;
 import com.inklusport.subscriptions.enums.TipoMovimiento;
 import com.inklusport.subscriptions.enums.TipoPagoSuscripcion;
-import com.inklusport.subscriptions.enums.TipoTransaccion;
 import com.inklusport.subscriptions.exception.PagoNotFoundException;
 import com.inklusport.subscriptions.exception.PlanNotFoundException;
-import com.inklusport.subscriptions.payment.PaymentPreferenceResult;
-import com.inklusport.subscriptions.payment.PaymentStatusResult;
+import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
 import com.inklusport.subscriptions.repository.HistorialSuscripcionRepository;
 import com.inklusport.subscriptions.repository.PagoSuscripcionRepository;
@@ -26,7 +25,7 @@ import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import com.inklusport.subscriptions.repository.TransaccionPasarelaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,9 +54,6 @@ public class PagoSuscripcionService {
     private final ComprobanteService comprobanteService;
     private final EmailService emailService;
     private final OrganizerIdentityService organizerIdentityService;
-
-    @Value("${app.payment.mode:mock}")
-    private String paymentMode;
 
     /**
      * Inicia el cobro de una suscripción o la activa si el plan es gratuito.
@@ -91,40 +87,54 @@ public class PagoSuscripcionService {
         String referencia = PREFIJO_REFERENCIA + pago.getId() + "-" + planAplicar.getId();
         pago.setReferenciaTransaccion(referencia);
 
-        PaymentPreferenceResult preferencia = paymentGatewayClient.crearPreferencia(
-                "Suscripcion InkluSport - " + planAplicar.getNombre(), planAplicar.getPrecio(), referencia);
-
-        TransaccionPasarela tx = new TransaccionPasarela();
-        tx.setPasarela(esMock() ? Pasarela.MOCK : Pasarela.MERCADOPAGO);
-        tx.setTipo(TipoTransaccion.SUSCRIPCION_ORGANIZADOR);
-        tx.setPreferenciaId(preferencia.getPreferenceId());
-        tx.setReferenciaExterna(referencia);
-        tx.setMoneda(pago.getMoneda());
-        tx.setMonto(pago.getMonto());
-        tx.setUrlCheckout(preferencia.getCheckoutUrl());
-        tx.setEstadoPasarela("pending");
-        tx = transaccionPasarelaRepository.save(tx);
-        pago.setTransaccion(tx);
-        pago = pagoSuscripcionRepository.save(pago);
-
-        if (esMock()) {
-            PaymentStatusResult mock = paymentGatewayClient.consultarPago(preferencia.getPreferenceId());
-            mock.setReferenciaExterna(referencia);
-            confirmarPago(mock);
-            pago = pagoSuscripcionRepository.findById(pago.getId()).orElse(pago);
-        }
-
+        // Checkout propio (no Checkout Pro de Mercado Pago): el cobro real ocurre en
+        // pagarConTarjeta() cuando el usuario completa el formulario de tarjeta en
+        // nuestra propia vista. Por eso no se crea preferencia ni hay checkoutUrl.
         return PagoCheckoutResponse.builder()
                 .pagoId(pago.getId())
                 .monto(pago.getMonto())
                 .estado(pago.getEstado())
                 .referenciaTransaccion(referencia)
-                .checkoutUrl(preferencia.getCheckoutUrl())
+                .checkoutUrl(null)
                 .build();
     }
 
     /**
-     * Confirma el estado de un pago de suscripción según la pasarela.
+     * Cobra un pago PENDIENTE ya creado por {@link #iniciarPago} con el token de tarjeta
+     * generado por el formulario propio (SDK JS de Mercado Pago). Reutiliza
+     * {@link #confirmarPago} para activar la suscripcion y emitir el comprobante, igual
+     * que si la confirmacion viniera del webhook.
+     */
+    @Transactional
+    public PagoEstadoResponse pagarConTarjeta(String email, String referencia, PagoTarjetaRequest datos,
+                                               boolean esAdmin) {
+        PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de suscripcion con referencia: " + referencia));
+
+        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(email)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+
+        if (pago.getEstado() == EstadoPago.PENDIENTE) {
+            Long planId = extraerPlanId(referencia);
+            Plan plan = planRepository.findById(planId).orElseThrow(() -> new PlanNotFoundException(planId));
+
+            PaymentStatusResult status = paymentGatewayClient.procesarPago(
+                    datos.getCardToken(), pago.getMonto(), referencia,
+                    "Suscripcion InkluSport - " + plan.getNombre(), datos.getInstallments(),
+                    datos.getPaymentMethodId(), email, datos.getDocType(), datos.getDocNumber());
+
+            confirmarPago(status);
+        }
+
+        return estadoActual(email, referencia, esAdmin);
+    }
+
+    /**
+     * Confirma el estado de un pago de suscripción según la pasarela. Invocado por el
+     * webhook de Mercado Pago con el estado real ya consultado contra la API, o por
+     * {@link #pagarConTarjeta} tras procesar el cobro con tarjeta.
      *
      * @param status resultado consultado en la pasarela
      */
@@ -231,6 +241,31 @@ public class PagoSuscripcionService {
     }
 
     /**
+     * Estado actual del cobro de una suscripcion por su referencia externa, con
+     * verificacion de propiedad (el organizador solo ve los suyos; un ADMIN, todos).
+     * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
+     */
+    @Transactional(readOnly = true)
+    public PagoEstadoResponse estadoActual(String email, String referencia, boolean esAdmin) {
+        PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de suscripcion con referencia: " + referencia));
+        Suscripcion suscripcion = pago.getSuscripcion();
+        if (!esAdmin && !suscripcion.getOrganizadorId().equals(email)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+        return PagoEstadoResponse.builder()
+                .referencia(referencia)
+                .tipo("SUSCRIPCION")
+                .pagoId(pago.getId())
+                .estado(pago.getEstado())
+                .monto(pago.getMonto())
+                .suscripcionActiva(suscripcion.getEstado() == EstadoSuscripcion.ACTIVA)
+                .reconciliadoAhora(false)
+                .build();
+    }
+
+    /**
      * Lista los pagos asociados a una suscripción.
      *
      * @param suscripcionId identificador de la suscripción
@@ -276,15 +311,6 @@ public class PagoSuscripcionService {
             return TipoPagoSuscripcion.CAMBIO_PLAN;
         }
         return TipoPagoSuscripcion.RENOVACION;
-    }
-
-    /**
-     * Indica si la pasarela está en modo simulado.
-     *
-     * @return {@code true} si el modo de pago es mock
-     */
-    private boolean esMock() {
-        return "mock".equalsIgnoreCase(paymentMode);
     }
 
     /**

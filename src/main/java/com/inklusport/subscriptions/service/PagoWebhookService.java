@@ -2,7 +2,7 @@ package com.inklusport.subscriptions.service;
 
 import com.inklusport.subscriptions.entity.WebhookPasarela;
 import com.inklusport.subscriptions.enums.Pasarela;
-import com.inklusport.subscriptions.payment.PaymentStatusResult;
+import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 import com.inklusport.subscriptions.repository.TransaccionPasarelaRepository;
 import com.inklusport.subscriptions.repository.WebhookPasarelaRepository;
 import lombok.RequiredArgsConstructor;

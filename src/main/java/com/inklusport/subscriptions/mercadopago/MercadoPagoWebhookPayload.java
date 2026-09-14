@@ -1,4 +1,4 @@
-package com.inklusport.subscriptions.payment;
+package com.inklusport.subscriptions.mercadopago;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

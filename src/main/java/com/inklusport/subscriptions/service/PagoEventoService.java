@@ -2,6 +2,7 @@ package com.inklusport.subscriptions.service;
 
 import com.inklusport.subscriptions.client.SportsServiceClient;
 import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
+import com.inklusport.subscriptions.dto.PagoEstadoResponse;
 import com.inklusport.subscriptions.dto.PagoEventoResponse;
 import com.inklusport.subscriptions.entity.ComprobantePago;
 import com.inklusport.subscriptions.entity.ConfiguracionEventoPago;
@@ -13,8 +14,8 @@ import com.inklusport.subscriptions.enums.TipoTransaccion;
 import com.inklusport.subscriptions.exception.EventoNoConfiguradoComoPagoException;
 import com.inklusport.subscriptions.exception.InscripcionDuplicadaException;
 import com.inklusport.subscriptions.exception.PagoNotFoundException;
-import com.inklusport.subscriptions.payment.PaymentPreferenceResult;
-import com.inklusport.subscriptions.payment.PaymentStatusResult;
+import com.inklusport.subscriptions.mercadopago.PaymentPreferenceResult;
+import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
 import com.inklusport.subscriptions.repository.PagoEventoRepository;
 import com.inklusport.subscriptions.repository.TransaccionPasarelaRepository;
@@ -162,6 +163,30 @@ public class PagoEventoService {
                 log.error("Pago evento {} aprobado pero fallo el comprobante: {}", pago.getId(), e.getMessage(), e);
             }
         }
+    }
+
+    /**
+     * Estado actual del cobro de una inscripcion a evento por su referencia externa,
+     * con verificacion de propiedad (el usuario solo ve los suyos; un ADMIN, todos).
+     * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
+     */
+    @Transactional(readOnly = true)
+    public PagoEstadoResponse estadoActual(String email, String referencia, boolean esAdmin) {
+        PagoEvento pago = pagoEventoRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de evento con referencia: " + referencia));
+        if (!esAdmin && !pago.getUsuarioId().equals(email)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+        return PagoEstadoResponse.builder()
+                .referencia(referencia)
+                .tipo("EVENTO")
+                .pagoId(pago.getId())
+                .estado(pago.getEstado())
+                .monto(pago.getMonto())
+                .suscripcionActiva(null)
+                .reconciliadoAhora(false)
+                .build();
     }
 
     /**
