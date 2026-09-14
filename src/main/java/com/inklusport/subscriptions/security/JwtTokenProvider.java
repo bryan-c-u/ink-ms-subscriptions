@@ -62,6 +62,20 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
+    public String getUserIdFromToken(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(key())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            Object uid = claims.get("uid");
+            return uid == null ? null : String.valueOf(uid);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public List<String> getRolesFromToken(String token) {
         try {

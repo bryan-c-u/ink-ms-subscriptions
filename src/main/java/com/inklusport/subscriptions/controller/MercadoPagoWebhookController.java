@@ -1,9 +1,11 @@
 package com.inklusport.subscriptions.controller;
 
 import com.inklusport.subscriptions.payment.MercadoPagoWebhookPayload;
+import com.inklusport.subscriptions.payment.MercadoPagoWebhookSignatureValidator;
 import com.inklusport.subscriptions.service.PagoWebhookService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,9 +22,15 @@ import org.springframework.web.bind.annotation.*;
 public class MercadoPagoWebhookController {
 
     private final PagoWebhookService pagoWebhookService;
+    private final MercadoPagoWebhookSignatureValidator signatureValidator;
+
+    @Value("${app.mercadopago.webhook-secret:}")
+    private String webhookSecret;
 
     @PostMapping
     public ResponseEntity<Void> recibirNotificacion(
+            @RequestHeader(name = "x-signature", required = false) String xSignature,
+            @RequestHeader(name = "x-request-id", required = false) String xRequestId,
             @RequestParam(name = "topic", required = false) String topicParam,
             @RequestParam(name = "type", required = false) String typeParam,
             @RequestParam(name = "id", required = false) String idParam,
@@ -35,6 +43,11 @@ public class MercadoPagoWebhookController {
         if (!"payment".equalsIgnoreCase(tipo) || paymentId == null || paymentId.isBlank()) {
             log.info("Notificacion de Mercado Pago ignorada (tipo={}, id={})", tipo, paymentId);
             return ResponseEntity.ok().build();
+        }
+
+        if (!signatureValidator.isValid(webhookSecret, xSignature, xRequestId, paymentId)) {
+            log.warn("Webhook de Mercado Pago rechazado por firma inválida (paymentId={})", paymentId);
+            return ResponseEntity.status(401).build();
         }
 
         try {

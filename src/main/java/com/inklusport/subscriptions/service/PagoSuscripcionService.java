@@ -54,6 +54,7 @@ public class PagoSuscripcionService {
     private final PaymentGatewayClient paymentGatewayClient;
     private final ComprobanteService comprobanteService;
     private final EmailService emailService;
+    private final OrganizerIdentityService organizerIdentityService;
 
     @Value("${app.payment.mode:mock}")
     private String paymentMode;
@@ -158,7 +159,9 @@ public class PagoSuscripcionService {
             try {
                 var comprobante = comprobanteService.generarComprobanteSuscripcion(
                         pago, "Suscripcion plan " + plan.getNombre());
-                emailService.enviarComprobantePago(suscripcion.getOrganizadorId(), comprobante.getNumeroComprobante(),
+                emailService.enviarComprobantePago(
+                        organizerIdentityService.resolveEmail(suscripcion.getOrganizadorId()),
+                        comprobante.getNumeroComprobante(),
                         "Suscripcion plan " + plan.getNombre(), pago.getMonto(),
                         comprobanteService.obtenerArchivo(comprobante));
             } catch (Exception e) {
@@ -238,6 +241,22 @@ public class PagoSuscripcionService {
         return pagoSuscripcionRepository.findBySuscripcionIdOrderByFechaPagoDesc(suscripcionId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.io.File obtenerComprobante(Long pagoId, String requesterId, boolean esAdmin) {
+        PagoSuscripcion pago = pagoSuscripcionRepository.findById(pagoId)
+                .orElseThrow(() -> new PagoNotFoundException("No se encontro el pago de suscripcion con id: " + pagoId));
+        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(requesterId)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tienes acceso a este comprobante");
+        }
+        var comprobante = comprobantePagoRepository.findByPagoSuscripcionId(pagoId)
+                .orElseThrow(() -> new PagoNotFoundException("El pago " + pagoId + " aun no tiene comprobante"));
+        java.io.File archivo = comprobanteService.obtenerArchivo(comprobante);
+        if (archivo == null || !archivo.exists()) {
+            throw new PagoNotFoundException("El comprobante del pago " + pagoId + " no tiene un PDF disponible");
+        }
+        return archivo;
     }
 
     /**

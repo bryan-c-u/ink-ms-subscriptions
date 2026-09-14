@@ -2,6 +2,7 @@ package com.inklusport.subscriptions.controller;
 
 import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
 import com.inklusport.subscriptions.dto.PagoEventoResponse;
+import com.inklusport.subscriptions.service.OrganizerIdentityService;
 import com.inklusport.subscriptions.service.PagoEventoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
@@ -10,7 +11,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -25,27 +25,40 @@ import java.util.List;
 public class PagoEventoController {
 
     private final PagoEventoService pagoEventoService;
+    private final OrganizerIdentityService organizerIdentityService;
 
     @PostMapping("/{eventoId}/inscripcion")
-    public ResponseEntity<PagoCheckoutResponse> inscribirse(@AuthenticationPrincipal String email,
+    public ResponseEntity<PagoCheckoutResponse> inscribirse(@AuthenticationPrincipal String principal,
                                                               @PathVariable String eventoId) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(pagoEventoService.inscribirse(email, eventoId));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(pagoEventoService.inscribirse(id(principal), eventoId));
     }
 
     @GetMapping("/historial")
-    public ResponseEntity<List<PagoEventoResponse>> historial(@AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(pagoEventoService.historialUsuario(email));
+    public ResponseEntity<List<PagoEventoResponse>> historial(@AuthenticationPrincipal String principal) {
+        return ResponseEntity.ok(pagoEventoService.historialUsuario(id(principal)));
     }
 
     @GetMapping("/{pagoId}/comprobante")
-    public ResponseEntity<Resource> descargarComprobante(@AuthenticationPrincipal String email,
+    public ResponseEntity<Resource> descargarComprobante(@AuthenticationPrincipal String principal,
                                                            Authentication authentication,
                                                            @PathVariable Long pagoId) {
-        boolean esAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        File archivo = pagoEventoService.obtenerComprobante(pagoId, email, esAdmin);
-        Resource recurso = new FileSystemResource(archivo);
+        boolean esAdmin = esAdmin(authentication);
+        File archivo = pagoEventoService.obtenerComprobante(pagoId, id(principal), esAdmin);
+        return pdf(archivo);
+    }
 
+    private String id(String principal) {
+        return organizerIdentityService.resolveUserId(principal);
+    }
+
+    private boolean esAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    private ResponseEntity<Resource> pdf(File archivo) {
+        Resource recurso = new FileSystemResource(archivo);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + archivo.getName() + "\"")

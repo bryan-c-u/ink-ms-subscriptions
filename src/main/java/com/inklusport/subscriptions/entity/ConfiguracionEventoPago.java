@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,6 +23,7 @@ public class ConfiguracionEventoPago {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "evento_id", nullable = false, unique = true, length = 36)
     private String eventoId;
 
@@ -33,6 +36,7 @@ public class ConfiguracionEventoPago {
     @Column(name = "valor_inscripcion", precision = 12, scale = 2)
     private BigDecimal valorInscripcion;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
