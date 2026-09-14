@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface BeneficioPlanRepository extends JpaRepository<BeneficioPlan, Long> {
 
+    List<BeneficioPlan> findByPlanIdOrderByOrdenAsc(Long planId);
+
     List<BeneficioPlan> findByPlanId(Long planId);
 
     void deleteByPlanId(Long planId);

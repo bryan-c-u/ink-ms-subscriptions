@@ -17,17 +17,14 @@ import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-/**
- * Implementacion real de PaymentGatewayClient contra la API de Mercado Pago (Checkout Pro).
- * El webhook nunca confia en el payload recibido: siempre vuelve a consultar el pago aqui
- * (consultarPago) antes de marcarlo APROBADO/RECHAZADO, tal como recomienda Mercado Pago.
- */
 @Service
+@ConditionalOnProperty(name = "app.payment.mode", havingValue = "mercadopago")
 @Slf4j
 public class MercadoPagoGatewayClient implements PaymentGatewayClient {
 
@@ -81,18 +78,16 @@ public class MercadoPagoGatewayClient implements PaymentGatewayClient {
                 requestBuilder.notificationUrl(notificationUrl);
             }
 
-            PreferenceClient client = new PreferenceClient();
-            Preference preference = client.create(requestBuilder.build());
-
+            Preference preference = new PreferenceClient().create(requestBuilder.build());
             return PaymentPreferenceResult.builder()
                     .preferenceId(preference.getId())
                     .checkoutUrl(preference.getInitPoint())
                     .build();
         } catch (MPApiException e) {
-            log.error("Error de la API de Mercado Pago al crear preferencia: {}", e.getApiResponse().getContent());
+            log.error("API Mercado Pago al crear preferencia: {}", e.getApiResponse().getContent());
             throw new PagoGatewayException("No se pudo crear la preferencia de pago en Mercado Pago", e);
         } catch (MPException e) {
-            log.error("Error al crear preferencia en Mercado Pago: {}", e.getMessage());
+            log.error("Error Mercado Pago al crear preferencia: {}", e.getMessage());
             throw new PagoGatewayException("No se pudo crear la preferencia de pago en Mercado Pago", e);
         }
     }
@@ -100,23 +95,23 @@ public class MercadoPagoGatewayClient implements PaymentGatewayClient {
     @Override
     public PaymentStatusResult consultarPago(String paymentIdExterno) {
         try {
-            PaymentClient client = new PaymentClient();
-            Payment payment = client.get(Long.parseLong(paymentIdExterno));
-
+            Payment payment = new PaymentClient().get(Long.parseLong(paymentIdExterno));
             return PaymentStatusResult.builder()
                     .paymentIdExterno(String.valueOf(payment.getId()))
                     .referenciaExterna(payment.getExternalReference())
                     .estado(mapEstado(payment.getStatus()))
+                    .estadoPasarela(payment.getStatus())
+                    .detalleEstado(payment.getStatusDetail())
                     .montoPagado(payment.getTransactionAmount())
                     .metodoPago(payment.getPaymentMethodId())
+                    .tipoPago(payment.getPaymentTypeId())
                     .build();
         } catch (MPApiException e) {
-            log.error("Error de la API de Mercado Pago al consultar pago {}: {}", paymentIdExterno,
-                    e.getApiResponse().getContent());
-            throw new PagoGatewayException("No se pudo consultar el pago " + paymentIdExterno + " en Mercado Pago", e);
+            log.error("API Mercado Pago al consultar pago {}: {}", paymentIdExterno, e.getApiResponse().getContent());
+            throw new PagoGatewayException("No se pudo consultar el pago " + paymentIdExterno, e);
         } catch (MPException e) {
-            log.error("Error al consultar pago {} en Mercado Pago: {}", paymentIdExterno, e.getMessage());
-            throw new PagoGatewayException("No se pudo consultar el pago " + paymentIdExterno + " en Mercado Pago", e);
+            log.error("Error Mercado Pago al consultar pago {}: {}", paymentIdExterno, e.getMessage());
+            throw new PagoGatewayException("No se pudo consultar el pago " + paymentIdExterno, e);
         }
     }
 
@@ -173,8 +168,10 @@ public class MercadoPagoGatewayClient implements PaymentGatewayClient {
         }
         return switch (mpStatus) {
             case "approved" -> EstadoPago.APROBADO;
-            case "rejected", "cancelled", "refunded", "charged_back" -> EstadoPago.RECHAZADO;
-            default -> EstadoPago.PENDIENTE; // pending, in_process, in_mediation, authorized
+            case "rejected" -> EstadoPago.RECHAZADO;
+            case "cancelled" -> EstadoPago.CANCELADO;
+            case "refunded", "charged_back" -> EstadoPago.REEMBOLSADO;
+            default -> EstadoPago.PENDIENTE;
         };
     }
 }

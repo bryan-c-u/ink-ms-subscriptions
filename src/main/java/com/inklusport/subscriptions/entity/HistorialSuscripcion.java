@@ -6,7 +6,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,7 +29,7 @@ public class HistorialSuscripcion {
     private Suscripcion suscripcion;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_movimiento", nullable = false)
+    @Column(name = "tipo_movimiento", nullable = false, length = 30)
     private TipoMovimiento tipoMovimiento;
 
     @Column(name = "plan_anterior_id")
@@ -34,7 +38,29 @@ public class HistorialSuscripcion {
     @Column(name = "plan_nuevo_id")
     private Long planNuevoId;
 
+    @Column(name = "estado_anterior", length = 20)
+    private String estadoAnterior;
+
+    @Column(name = "estado_nuevo", length = 20)
+    private String estadoNuevo;
+
+    @Column(name = "fecha_fin_anterior")
+    private LocalDate fechaFinAnterior;
+
+    @Column(name = "fecha_fin_nueva")
+    private LocalDate fechaFinNueva;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal monto;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "realizado_por", length = 36)
+    private String realizadoPor;
+
+    @Column(length = 500)
+    private String notas;
+
     @CreationTimestamp
-    @Column(name = "fecha_movimiento")
+    @Column(name = "fecha_movimiento", nullable = false, updatable = false)
     private LocalDateTime fechaMovimiento;
 }

@@ -5,11 +5,6 @@ import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 
 import java.math.BigDecimal;
 
-/**
- * Abstrae la pasarela de pago (RF70) para que el resto del dominio no dependa
- * directamente del SDK de Mercado Pago. Una futura pasarela alternativa solo
- * necesita otra implementacion de esta interfaz.
- */
 public interface PaymentGatewayClient {
 
     PaymentPreferenceResult crearPreferencia(String titulo, BigDecimal monto, String referenciaExterna);

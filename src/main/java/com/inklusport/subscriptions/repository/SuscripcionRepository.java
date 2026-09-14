@@ -29,11 +29,11 @@ public interface SuscripcionRepository extends JpaRepository<Suscripcion, Long> 
 
     @Modifying
     @Transactional
-    @Query("UPDATE Suscripcion s SET s.eventosCreadosMes = s.eventosCreadosMes + 1 WHERE s.id = :id")
+    @Query("UPDATE Suscripcion s SET s.eventosCreadosPeriodo = s.eventosCreadosPeriodo + 1 WHERE s.id = :id")
     void incrementarEventosCreados(@Param("id") Long id);
 
     @Modifying
     @Transactional
-    @Query("UPDATE Suscripcion s SET s.eventosCreadosMes = 0 WHERE s.estado = 'ACTIVA'")
-    void reiniciarContadorEventosMensual();
+    @Query("UPDATE Suscripcion s SET s.eventosCreadosPeriodo = 0, s.periodoInicio = :periodoInicio WHERE s.estado = 'ACTIVA'")
+    void reiniciarContadorEventosMensual(@Param("periodoInicio") LocalDate periodoInicio);
 }

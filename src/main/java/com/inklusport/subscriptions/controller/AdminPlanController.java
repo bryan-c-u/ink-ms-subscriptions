@@ -16,7 +16,7 @@ import java.util.List;
  * RF67: administracion de planes de suscripcion.
  * Nota: se usa /api/planes/admin (no /api/admin/planes) porque en el gateway
  * /api/admin/** ya esta reservado para ink-ms-users; anidar bajo /api/planes/**
- * evita esa colision de rutas.
+ * evita esa colision de rutas. Con /api/planes/admin evita la colision de rutas.
  */
 @RestController
 @RequestMapping("/api/planes/admin")

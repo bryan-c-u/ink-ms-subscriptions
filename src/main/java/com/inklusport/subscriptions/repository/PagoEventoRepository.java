@@ -26,12 +26,7 @@ public interface PagoEventoRepository extends JpaRepository<PagoEvento, Long> {
             @Param("desde") LocalDateTime desde,
             @Param("hasta") LocalDateTime hasta);
 
-    /**
-     * Fila por evento: [eventoId, numeroInscritos, montoTotal]. No hay FK real entre
-     * pago_evento y configuracion_evento_pago (evento_id es un id externo), por eso el
-     * join se hace por igualdad de campo en la consulta en vez de una relacion JPA.
-     */
-    @Query("SELECT p.eventoId, COUNT(p), COALESCE(SUM(p.monto), 0) FROM PagoEvento p " +
+    @Query("SELECT p.eventoId, COUNT(p), COALESCE(SUM(p.monto), 0), COALESCE(SUM(p.comisionPlataforma), 0) FROM PagoEvento p " +
             "WHERE p.estado = :estado AND p.fechaPago BETWEEN :desde AND :hasta " +
             "GROUP BY p.eventoId")
     List<Object[]> reporteGlobalPorEvento(
@@ -39,9 +34,8 @@ public interface PagoEventoRepository extends JpaRepository<PagoEvento, Long> {
             @Param("desde") LocalDateTime desde,
             @Param("hasta") LocalDateTime hasta);
 
-    @Query("SELECT p.eventoId, COUNT(p), COALESCE(SUM(p.monto), 0) FROM PagoEvento p, ConfiguracionEventoPago c " +
-            "WHERE p.eventoId = c.eventoId AND c.organizadorId = :organizadorId " +
-            "AND p.estado = :estado AND p.fechaPago BETWEEN :desde AND :hasta " +
+    @Query("SELECT p.eventoId, COUNT(p), COALESCE(SUM(p.monto), 0), COALESCE(SUM(p.comisionPlataforma), 0) FROM PagoEvento p " +
+            "WHERE p.organizadorId = :organizadorId AND p.estado = :estado AND p.fechaPago BETWEEN :desde AND :hasta " +
             "GROUP BY p.eventoId")
     List<Object[]> reportePorOrganizadorYEvento(
             @Param("organizadorId") String organizadorId,

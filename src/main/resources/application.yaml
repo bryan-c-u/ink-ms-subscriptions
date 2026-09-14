@@ -1,17 +1,19 @@
 spring:
   application:
-    name: subscriptions
+    name: ink-ms-subscriptions
 
   datasource:
-    url: jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      # El esquema lo crea init-mysql; validate choca CHAR/ENUM de MySQL con el mapeo JPA.
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: ${SHOW_SQL:true}
+    open-in-view: false
     properties:
       hibernate:
         format-sql: true
@@ -44,30 +46,89 @@ server:
 
 jwt:
   secret: ${JWT_SECRET:inklusport2024superSecretKeyForJWTtokenGenerationWith512bitsAlgorithmHS512}
-  expiration: 86400000
+  expiration: ${JWT_EXPIRATION:86400000}
 
 auth:
   service:
     url: ${AUTH_SERVICE_URL:http://localhost:3001}
 
+users:
+  service:
+    url: ${USERS_SERVICE_URL:http://localhost:3002}
+
+sports:
+  service:
+    url: ${SPORTS_SERVICE_URL:http://localhost:3003}
+
 mercadopago:
-  access-token: ${MP_ACCESS_TOKEN:}
-  public-key: ${MP_PUBLIC_KEY:}
   # "Clave secreta" del panel de MP (Webhooks). Si se deja vacia, la firma del webhook no se valida.
   webhook-secret: ${MP_WEBHOOK_SECRET:}
 
 app:
+  mail-enabled: ${MAIL_ENABLED:false}
   comprobantes:
     storage-path: ${COMPROBANTES_STORAGE_PATH:./comprobantes}
   suscripciones:
-    dias-aviso-vencimiento: ${DIAS_AVISO_VENCIMIENTO:5}
+    dias-aviso-vencimiento: ${DIAS_AVISO_VENCIMIENTO:7}
+  payment:
+    mode: ${PAYMENT_GATEWAY_MODE:mock}
   mercadopago:
+    access-token: ${MP_ACCESS_TOKEN:}
+    public-key: ${MP_PUBLIC_KEY:}
     currency: ${MP_CURRENCY:COP}
     back-url-success: ${MP_BACK_URL_SUCCESS:http://localhost:4200/pagos/exito}
     back-url-pending: ${MP_BACK_URL_PENDING:http://localhost:4200/pagos/pendiente}
     back-url-failure: ${MP_BACK_URL_FAILURE:http://localhost:4200/pagos/error}
     notification-url: ${MP_NOTIFICATION_URL:http://localhost:3005/api/pagos/mercadopago/webhook}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 logging:
   level:
-    com.inklusport.subscriptions: DEBUG
+    com.inklusport.subscriptions: ${LOG_LEVEL:DEBUG}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://mysql:3306/inklusport_subscriptions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:none}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:subscriptions;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  mail:
+    host: localhost
+    port: 25
+jwt:
+  secret: test-secret-key-that-is-long-enough-for-hs512-algorithm-inklusport-subscriptions
+  expiration: 86400000
+app:
+  mail-enabled: false
+  payment:
+    mode: mock

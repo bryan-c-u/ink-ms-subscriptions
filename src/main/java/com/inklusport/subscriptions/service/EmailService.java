@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.math.BigDecimal;
 
+/**
+ * Servicio de envío asíncrono de correos transaccionales.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,101 +26,113 @@ public class EmailService {
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
+    @Value("${app.mail-enabled:false}")
+    private boolean mailEnabled;
+
+    /**
+     * Indica si el envío de correo está deshabilitado.
+     *
+     * @return {@code true} si no se debe enviar correo
+     */
     private boolean correoDeshabilitado() {
-        if (fromEmail == null || fromEmail.isBlank()) {
-            log.warn("spring.mail.username (MAIL_USERNAME) no esta configurado; se omite el envio de correo");
+        if (!mailEnabled || fromEmail == null || fromEmail.isBlank()) {
+            log.debug("Correo deshabilitado; se omite el envio");
             return true;
         }
         return false;
     }
 
+    /**
+     * Envía el comprobante de pago al destinatario, con PDF adjunto si existe.
+     *
+     * @param to                 correo destino
+     * @param numeroComprobante  número del comprobante
+     * @param concepto           concepto del pago
+     * @param monto              monto pagado
+     * @param adjuntoPdf         PDF del comprobante, o {@code null}
+     */
     @Async
     public void enviarComprobantePago(String to, String numeroComprobante, String concepto,
-                                       BigDecimal monto, File adjuntoPdf) {
-        if (correoDeshabilitado()) {
+                                      BigDecimal monto, File adjuntoPdf) {
+        if (correoDeshabilitado() || to == null || !to.contains("@")) {
             return;
         }
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, adjuntoPdf != null, "UTF-8");
-
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject("Comprobante de pago - InkluSport");
             helper.setText(buildComprobanteContent(numeroComprobante, concepto, monto), true);
-
             if (adjuntoPdf != null && adjuntoPdf.exists()) {
                 helper.addAttachment("comprobante-" + numeroComprobante + ".pdf", adjuntoPdf);
             }
-
             mailSender.send(message);
-            log.info("Comprobante {} enviado a: {}", numeroComprobante, to);
+            log.info("Comprobante {} enviado a {}", numeroComprobante, to);
         } catch (MessagingException e) {
             log.error("Error al enviar comprobante {} a {}: {}", numeroComprobante, to, e.getMessage());
         }
     }
 
+    /**
+     * Envía un aviso de vencimiento próximo de la suscripción.
+     *
+     * @param to            correo destino
+     * @param planNombre    nombre del plan
+     * @param diasRestantes días restantes de vigencia
+     */
     @Async
     public void enviarAvisoVencimiento(String to, String planNombre, int diasRestantes) {
-        if (correoDeshabilitado()) {
+        if (correoDeshabilitado() || to == null || !to.contains("@")) {
+            log.info("Aviso de vencimiento del plan {} ({} dias) para {}", planNombre, diasRestantes, to);
             return;
         }
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject("Tu suscripcion esta por vencer - InkluSport");
             helper.setText(buildAvisoVencimientoContent(planNombre, diasRestantes), true);
-
             mailSender.send(message);
-            log.info("Aviso de vencimiento enviado a: {}", to);
         } catch (MessagingException e) {
             log.error("Error al enviar aviso de vencimiento a {}: {}", to, e.getMessage());
         }
     }
 
+    /**
+     * Construye el HTML del correo de comprobante.
+     *
+     * @param numeroComprobante número del comprobante
+     * @param concepto          concepto del pago
+     * @param monto             monto pagado
+     * @return cuerpo HTML
+     */
     private String buildComprobanteContent(String numeroComprobante, String concepto, BigDecimal monto) {
         return """
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body style="font-family: Arial, sans-serif;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #1E3A8A;">InkluSport</h2>
-                    <h3>Comprobante de pago</h3>
-                    <p>Tu pago fue procesado exitosamente.</p>
-                    <table style="width: 100%%; border-collapse: collapse;">
-                        <tr><td style="padding: 6px; color:#666;">Concepto</td><td style="padding: 6px;"><strong>%s</strong></td></tr>
-                        <tr><td style="padding: 6px; color:#666;">Monto</td><td style="padding: 6px;"><strong>$%s</strong></td></tr>
-                        <tr><td style="padding: 6px; color:#666;">N&uacute;mero de comprobante</td><td style="padding: 6px;"><strong>%s</strong></td></tr>
-                    </table>
-                    <p>Adjuntamos el comprobante en formato PDF para tus registros.</p>
-                    <hr>
-                    <p style="font-size: 12px; color: #666;">InkluSport - Deporte para todos</p>
-                </div>
-            </body>
-            </html>
+            <html><body style="font-family: Arial, sans-serif;">
+            <h2>InkluSport</h2>
+            <p>Tu pago fue procesado exitosamente.</p>
+            <p>Concepto: <strong>%s</strong></p>
+            <p>Monto: <strong>$%s</strong></p>
+            <p>Comprobante: <strong>%s</strong></p>
+            </body></html>
             """.formatted(concepto, monto.toPlainString(), numeroComprobante);
     }
 
+    /**
+     * Construye el HTML del aviso de vencimiento.
+     *
+     * @param planNombre    nombre del plan
+     * @param diasRestantes días restantes de vigencia
+     * @return cuerpo HTML
+     */
     private String buildAvisoVencimientoContent(String planNombre, int diasRestantes) {
         return """
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body style="font-family: Arial, sans-serif;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #1E3A8A;">InkluSport</h2>
-                    <h3>Tu suscripcion esta por vencer</h3>
-                    <p>Tu suscripcion al plan <strong>%s</strong> vence en <strong>%d dia(s)</strong>.</p>
-                    <p>Renueva tu suscripcion para seguir disfrutando de todos los beneficios de tu plan sin interrupciones.</p>
-                    <hr>
-                    <p style="font-size: 12px; color: #666;">InkluSport - Deporte para todos</p>
-                </div>
-            </body>
-            </html>
+            <html><body style="font-family: Arial, sans-serif;">
+            <h2>InkluSport</h2>
+            <p>Tu suscripcion al plan <strong>%s</strong> vence en <strong>%d dia(s)</strong>.</p>
+            </body></html>
             """.formatted(planNombre, diasRestantes);
     }
 }
