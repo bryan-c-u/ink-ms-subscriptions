@@ -1,8 +1,8 @@
-package com.inklusport.suscripciones.controller;
+package com.inklusport.subscriptions.controller;
 
-import com.inklusport.suscripciones.dto.PagoCheckoutResponse;
-import com.inklusport.suscripciones.dto.PagoEventoResponse;
-import com.inklusport.suscripciones.service.PagoEventoService;
+import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
+import com.inklusport.subscriptions.dto.PagoEventoResponse;
+import com.inklusport.subscriptions.service.PagoEventoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;

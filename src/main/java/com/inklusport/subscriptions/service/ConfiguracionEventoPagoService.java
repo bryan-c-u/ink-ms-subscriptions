@@ -1,12 +1,12 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.ConfiguracionEventoPagoRequest;
-import com.inklusport.suscripciones.dto.ConfiguracionEventoPagoResponse;
-import com.inklusport.suscripciones.entity.ConfiguracionEventoPago;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.exception.ConfiguracionEventoPagoNotFoundException;
-import com.inklusport.suscripciones.repository.ConfiguracionEventoPagoRepository;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoRequest;
+import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoResponse;
+import com.inklusport.subscriptions.entity.ConfiguracionEventoPago;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.exception.ConfiguracionEventoPagoNotFoundException;
+import com.inklusport.subscriptions.repository.ConfiguracionEventoPagoRepository;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;

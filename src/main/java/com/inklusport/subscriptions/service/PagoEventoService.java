@@ -1,18 +1,19 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.PagoCheckoutResponse;
-import com.inklusport.suscripciones.dto.PagoEventoResponse;
-import com.inklusport.suscripciones.entity.ComprobantePago;
-import com.inklusport.suscripciones.entity.ConfiguracionEventoPago;
-import com.inklusport.suscripciones.entity.PagoEvento;
-import com.inklusport.suscripciones.enums.EstadoPago;
-import com.inklusport.suscripciones.exception.EventoNoConfiguradoComoPagoException;
-import com.inklusport.suscripciones.exception.InscripcionDuplicadaException;
-import com.inklusport.suscripciones.exception.PagoNotFoundException;
-import com.inklusport.suscripciones.mercadopago.PaymentPreferenceResult;
-import com.inklusport.suscripciones.mercadopago.PaymentStatusResult;
-import com.inklusport.suscripciones.repository.ComprobantePagoRepository;
-import com.inklusport.suscripciones.repository.PagoEventoRepository;
+import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
+import com.inklusport.subscriptions.dto.PagoEstadoResponse;
+import com.inklusport.subscriptions.dto.PagoEventoResponse;
+import com.inklusport.subscriptions.entity.ComprobantePago;
+import com.inklusport.subscriptions.entity.ConfiguracionEventoPago;
+import com.inklusport.subscriptions.entity.PagoEvento;
+import com.inklusport.subscriptions.enums.EstadoPago;
+import com.inklusport.subscriptions.exception.EventoNoConfiguradoComoPagoException;
+import com.inklusport.subscriptions.exception.InscripcionDuplicadaException;
+import com.inklusport.subscriptions.exception.PagoNotFoundException;
+import com.inklusport.subscriptions.mercadopago.PaymentPreferenceResult;
+import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
+import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
+import com.inklusport.subscriptions.repository.PagoEventoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -102,6 +103,30 @@ public class PagoEventoService {
         } else {
             log.info("Pago de evento {} finalizo en estado {}", pago.getId(), status.getEstado());
         }
+    }
+
+    /**
+     * Estado actual del cobro de una inscripcion a evento por su referencia externa,
+     * con verificacion de propiedad (el usuario solo ve los suyos; un ADMIN, todos).
+     * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
+     */
+    @Transactional(readOnly = true)
+    public PagoEstadoResponse estadoActual(String email, String referencia, boolean esAdmin) {
+        PagoEvento pago = pagoEventoRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de evento con referencia: " + referencia));
+        if (!esAdmin && !pago.getUsuarioId().equals(email)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+        return PagoEstadoResponse.builder()
+                .referencia(referencia)
+                .tipo("EVENTO")
+                .pagoId(pago.getId())
+                .estado(pago.getEstado())
+                .monto(pago.getMonto())
+                .suscripcionActiva(null)
+                .reconciliadoAhora(false)
+                .build();
     }
 
     @Transactional(readOnly = true)

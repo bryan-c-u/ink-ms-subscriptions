@@ -1,9 +1,12 @@
-package com.inklusport.suscripciones.mercadopago;
+package com.inklusport.subscriptions.mercadopago;
 
-import com.inklusport.suscripciones.enums.EstadoPago;
-import com.inklusport.suscripciones.exception.PagoGatewayException;
-import com.inklusport.suscripciones.service.PaymentGatewayClient;
+import com.inklusport.subscriptions.enums.EstadoPago;
+import com.inklusport.subscriptions.exception.PagoGatewayException;
+import com.inklusport.subscriptions.service.PaymentGatewayClient;
+import com.mercadopago.client.common.IdentificationRequest;
 import com.mercadopago.client.payment.PaymentClient;
+import com.mercadopago.client.payment.PaymentCreateRequest;
+import com.mercadopago.client.payment.PaymentPayerRequest;
 import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
@@ -62,8 +65,17 @@ public class MercadoPagoGatewayClient implements PaymentGatewayClient {
             PreferenceRequest.PreferenceRequestBuilder requestBuilder = PreferenceRequest.builder()
                     .items(List.of(item))
                     .backUrls(backUrls)
-                    .autoReturn("approved") // al aprobarse el pago, Mercado Pago redirige solo a back_urls.success
                     .externalReference(referenciaExterna);
+
+            // auto_return hace que Mercado Pago redirija solo a back_urls.success al aprobarse.
+            // Pero MP descarta las back_urls que no sean publicas (http://localhost) y entonces
+            // rechaza la preferencia con "auto_return invalid". Solo se activa si la URL es https.
+            if (backUrlSuccess != null && backUrlSuccess.startsWith("https://")) {
+                requestBuilder.autoReturn("approved");
+            } else {
+                log.warn("back-url-success no es https ({}). Se omite auto_return: tras pagar, el usuario "
+                        + "debera pulsar 'Volver al sitio' en Mercado Pago.", backUrlSuccess);
+            }
 
             if (notificationUrl != null && !notificationUrl.isBlank()) {
                 requestBuilder.notificationUrl(notificationUrl);
@@ -105,6 +117,53 @@ public class MercadoPagoGatewayClient implements PaymentGatewayClient {
         } catch (MPException e) {
             log.error("Error al consultar pago {} en Mercado Pago: {}", paymentIdExterno, e.getMessage());
             throw new PagoGatewayException("No se pudo consultar el pago " + paymentIdExterno + " en Mercado Pago", e);
+        }
+    }
+
+    @Override
+    public PaymentStatusResult procesarPago(String cardToken, BigDecimal monto, String referenciaExterna,
+                                             String descripcion, Integer cuotas, String paymentMethodId,
+                                             String payerEmail, String docType, String docNumber) {
+        try {
+            IdentificationRequest identification = IdentificationRequest.builder()
+                    .type(docType)
+                    .number(docNumber)
+                    .build();
+
+            PaymentPayerRequest payer = PaymentPayerRequest.builder()
+                    .email(payerEmail)
+                    .identification(identification)
+                    .build();
+
+            PaymentCreateRequest.PaymentCreateRequestBuilder requestBuilder = PaymentCreateRequest.builder()
+                    .transactionAmount(monto)
+                    .token(cardToken)
+                    .description(descripcion)
+                    .installments(cuotas)
+                    .paymentMethodId(paymentMethodId)
+                    .payer(payer)
+                    .externalReference(referenciaExterna);
+
+            if (notificationUrl != null && !notificationUrl.isBlank()) {
+                requestBuilder.notificationUrl(notificationUrl);
+            }
+
+            PaymentClient client = new PaymentClient();
+            Payment payment = client.create(requestBuilder.build());
+
+            return PaymentStatusResult.builder()
+                    .paymentIdExterno(String.valueOf(payment.getId()))
+                    .referenciaExterna(payment.getExternalReference())
+                    .estado(mapEstado(payment.getStatus()))
+                    .montoPagado(payment.getTransactionAmount())
+                    .metodoPago(payment.getPaymentMethodId())
+                    .build();
+        } catch (MPApiException e) {
+            log.error("Error de la API de Mercado Pago al procesar pago con tarjeta: {}", e.getApiResponse().getContent());
+            throw new PagoGatewayException("No se pudo procesar el pago con Mercado Pago", e);
+        } catch (MPException e) {
+            log.error("Error al procesar pago con tarjeta en Mercado Pago: {}", e.getMessage());
+            throw new PagoGatewayException("No se pudo procesar el pago con Mercado Pago", e);
         }
     }
 

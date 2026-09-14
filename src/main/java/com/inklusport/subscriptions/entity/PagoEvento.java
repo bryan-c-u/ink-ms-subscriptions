@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.entity;
+package com.inklusport.subscriptions.entity;
 
-import com.inklusport.suscripciones.enums.EstadoPago;
+import com.inklusport.subscriptions.enums.EstadoPago;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,3 +1,73 @@
 spring:
   application:
     name: subscriptions
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format-sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtps
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          starttls:
+            enable: false
+          socketFactory:
+            port: 465
+            class: javax.net.ssl.SSLSocketFactory
+
+server:
+  port: 3005
+  error:
+    include-message: always
+    include-stacktrace: on-param
+    include-binding-errors: always
+
+jwt:
+  secret: ${JWT_SECRET:inklusport2024superSecretKeyForJWTtokenGenerationWith512bitsAlgorithmHS512}
+  expiration: 86400000
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://localhost:3001}
+
+mercadopago:
+  access-token: ${MP_ACCESS_TOKEN:}
+  public-key: ${MP_PUBLIC_KEY:}
+  # "Clave secreta" del panel de MP (Webhooks). Si se deja vacia, la firma del webhook no se valida.
+  webhook-secret: ${MP_WEBHOOK_SECRET:}
+
+app:
+  comprobantes:
+    storage-path: ${COMPROBANTES_STORAGE_PATH:./comprobantes}
+  suscripciones:
+    dias-aviso-vencimiento: ${DIAS_AVISO_VENCIMIENTO:5}
+  mercadopago:
+    currency: ${MP_CURRENCY:COP}
+    back-url-success: ${MP_BACK_URL_SUCCESS:http://localhost:4200/pagos/exito}
+    back-url-pending: ${MP_BACK_URL_PENDING:http://localhost:4200/pagos/pendiente}
+    back-url-failure: ${MP_BACK_URL_FAILURE:http://localhost:4200/pagos/error}
+    notification-url: ${MP_NOTIFICATION_URL:http://localhost:3005/api/pagos/mercadopago/webhook}
+
+logging:
+  level:
+    com.inklusport.subscriptions: DEBUG

@@ -1,25 +1,27 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.PagoCheckoutResponse;
-import com.inklusport.suscripciones.dto.PagoSuscripcionResponse;
-import com.inklusport.suscripciones.entity.HistorialSuscripcion;
-import com.inklusport.suscripciones.entity.PagoSuscripcion;
-import com.inklusport.suscripciones.entity.Plan;
-import com.inklusport.suscripciones.entity.Suscripcion;
-import com.inklusport.suscripciones.enums.EstadoPago;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.enums.TipoMovimiento;
-import com.inklusport.suscripciones.exception.PagoNotFoundException;
-import com.inklusport.suscripciones.exception.PlanNotFoundException;
-import com.inklusport.suscripciones.mercadopago.PaymentPreferenceResult;
-import com.inklusport.suscripciones.mercadopago.PaymentStatusResult;
-import com.inklusport.suscripciones.repository.ComprobantePagoRepository;
-import com.inklusport.suscripciones.repository.HistorialSuscripcionRepository;
-import com.inklusport.suscripciones.repository.PagoSuscripcionRepository;
-import com.inklusport.suscripciones.repository.PlanRepository;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
+import com.inklusport.subscriptions.dto.PagoEstadoResponse;
+import com.inklusport.subscriptions.dto.PagoSuscripcionResponse;
+import com.inklusport.subscriptions.dto.PagoTarjetaRequest;
+import com.inklusport.subscriptions.entity.HistorialSuscripcion;
+import com.inklusport.subscriptions.entity.PagoSuscripcion;
+import com.inklusport.subscriptions.entity.Plan;
+import com.inklusport.subscriptions.entity.Suscripcion;
+import com.inklusport.subscriptions.enums.EstadoPago;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.enums.TipoMovimiento;
+import com.inklusport.subscriptions.exception.PagoNotFoundException;
+import com.inklusport.subscriptions.exception.PlanNotFoundException;
+import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
+import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
+import com.inklusport.subscriptions.repository.HistorialSuscripcionRepository;
+import com.inklusport.subscriptions.repository.PagoSuscripcionRepository;
+import com.inklusport.subscriptions.repository.PlanRepository;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,16 +81,48 @@ public class PagoSuscripcionService {
         pago.setReferenciaTransaccion(referencia);
         pago = pagoSuscripcionRepository.save(pago);
 
-        PaymentPreferenceResult preferencia = paymentGatewayClient.crearPreferencia(
-                "Suscripcion InkluSport - " + planAplicar.getNombre(), planAplicar.getPrecio(), referencia);
-
+        // Checkout propio (no Checkout Pro de Mercado Pago): el cobro real ocurre en
+        // pagarConTarjeta() cuando el usuario completa el formulario de tarjeta en
+        // nuestra propia vista. Por eso no se crea preferencia ni hay checkoutUrl.
         return PagoCheckoutResponse.builder()
                 .pagoId(pago.getId())
                 .monto(pago.getMonto())
                 .estado(pago.getEstado())
                 .referenciaTransaccion(referencia)
-                .checkoutUrl(preferencia.getCheckoutUrl())
+                .checkoutUrl(null)
                 .build();
+    }
+
+    /**
+     * Cobra un pago PENDIENTE ya creado por {@link #iniciarPago} con el token de tarjeta
+     * generado por el formulario propio (SDK JS de Mercado Pago). Reutiliza
+     * {@link #confirmarPago} para activar la suscripcion y emitir el comprobante, igual
+     * que si la confirmacion viniera del webhook.
+     */
+    @Transactional
+    public PagoEstadoResponse pagarConTarjeta(String email, String referencia, PagoTarjetaRequest datos,
+                                               boolean esAdmin) {
+        PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de suscripcion con referencia: " + referencia));
+
+        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(email)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+
+        if (pago.getEstado() == EstadoPago.PENDIENTE) {
+            Long planId = extraerPlanId(referencia);
+            Plan plan = planRepository.findById(planId).orElseThrow(() -> new PlanNotFoundException(planId));
+
+            PaymentStatusResult status = paymentGatewayClient.procesarPago(
+                    datos.getCardToken(), pago.getMonto(), referencia,
+                    "Suscripcion InkluSport - " + plan.getNombre(), datos.getInstallments(),
+                    datos.getPaymentMethodId(), email, datos.getDocType(), datos.getDocNumber());
+
+            confirmarPago(status);
+        }
+
+        return estadoActual(email, referencia, esAdmin);
     }
 
     /** Invocado por el webhook de Mercado Pago con el estado real ya consultado contra la API. */
@@ -171,6 +205,31 @@ public class PagoSuscripcionService {
         historialSuscripcionRepository.save(historial);
 
         return suscripcion;
+    }
+
+    /**
+     * Estado actual del cobro de una suscripcion por su referencia externa, con
+     * verificacion de propiedad (el organizador solo ve los suyos; un ADMIN, todos).
+     * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
+     */
+    @Transactional(readOnly = true)
+    public PagoEstadoResponse estadoActual(String email, String referencia, boolean esAdmin) {
+        PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de suscripcion con referencia: " + referencia));
+        Suscripcion suscripcion = pago.getSuscripcion();
+        if (!esAdmin && !suscripcion.getOrganizadorId().equals(email)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+        return PagoEstadoResponse.builder()
+                .referencia(referencia)
+                .tipo("SUSCRIPCION")
+                .pagoId(pago.getId())
+                .estado(pago.getEstado())
+                .monto(pago.getMonto())
+                .suscripcionActiva(suscripcion.getEstado() == EstadoSuscripcion.ACTIVA)
+                .reconciliadoAhora(false)
+                .build();
     }
 
     @Transactional(readOnly = true)

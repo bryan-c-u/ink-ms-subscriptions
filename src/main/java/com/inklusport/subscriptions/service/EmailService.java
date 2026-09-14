@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;

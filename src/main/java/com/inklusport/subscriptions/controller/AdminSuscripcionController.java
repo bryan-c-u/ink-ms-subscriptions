@@ -1,9 +1,9 @@
-package com.inklusport.suscripciones.controller;
+package com.inklusport.subscriptions.controller;
 
-import com.inklusport.suscripciones.dto.CambiarEstadoSuscripcionRequest;
-import com.inklusport.suscripciones.dto.HistorialSuscripcionResponse;
-import com.inklusport.suscripciones.dto.SuscripcionResponse;
-import com.inklusport.suscripciones.service.SuscripcionService;
+import com.inklusport.subscriptions.dto.CambiarEstadoSuscripcionRequest;
+import com.inklusport.subscriptions.dto.HistorialSuscripcionResponse;
+import com.inklusport.subscriptions.dto.SuscripcionResponse;
+import com.inklusport.subscriptions.service.SuscripcionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

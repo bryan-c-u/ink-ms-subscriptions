@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.mercadopago.PaymentStatusResult;
+import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

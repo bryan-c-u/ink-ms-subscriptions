@@ -1,9 +1,9 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.entity.ComprobantePago;
-import com.inklusport.suscripciones.entity.PagoEvento;
-import com.inklusport.suscripciones.entity.PagoSuscripcion;
-import com.inklusport.suscripciones.repository.ComprobantePagoRepository;
+import com.inklusport.subscriptions.entity.ComprobantePago;
+import com.inklusport.subscriptions.entity.PagoEvento;
+import com.inklusport.subscriptions.entity.PagoSuscripcion;
+import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.openpdf.text.Chunk;

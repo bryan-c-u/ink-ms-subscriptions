@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class LimiteEventosExcedidoException extends RuntimeException {
     public LimiteEventosExcedidoException(String organizadorId, int limite) {

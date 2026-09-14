@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class PagoGatewayException extends RuntimeException {
     public PagoGatewayException(String message, Throwable cause) {

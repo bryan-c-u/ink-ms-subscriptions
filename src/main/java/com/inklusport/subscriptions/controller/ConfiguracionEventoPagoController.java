@@ -1,8 +1,8 @@
 package com.inklusport.subscriptions.controller;
 
-import com.inklusport.suscripciones.dto.ConfiguracionEventoPagoRequest;
-import com.inklusport.suscripciones.dto.ConfiguracionEventoPagoResponse;
-import com.inklusport.suscripciones.service.ConfiguracionEventoPagoService;
+import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoRequest;
+import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoResponse;
+import com.inklusport.subscriptions.service.ConfiguracionEventoPagoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

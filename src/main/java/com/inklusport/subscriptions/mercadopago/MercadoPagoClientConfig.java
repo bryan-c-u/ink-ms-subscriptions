@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.mercadopago;
+package com.inklusport.subscriptions.mercadopago;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;

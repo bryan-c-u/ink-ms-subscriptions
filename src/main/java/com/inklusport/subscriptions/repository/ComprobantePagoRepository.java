@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.repository;
+package com.inklusport.subscriptions.repository;
 
-import com.inklusport.suscripciones.entity.ComprobantePago;
+import com.inklusport.subscriptions.entity.ComprobantePago;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

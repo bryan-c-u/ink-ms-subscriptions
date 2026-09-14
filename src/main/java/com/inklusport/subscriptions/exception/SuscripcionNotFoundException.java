@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class SuscripcionNotFoundException extends RuntimeException {
     public SuscripcionNotFoundException(Long id) {

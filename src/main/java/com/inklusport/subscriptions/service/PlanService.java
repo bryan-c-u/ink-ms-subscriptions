@@ -1,14 +1,14 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.PlanRequest;
-import com.inklusport.suscripciones.dto.PlanResponse;
-import com.inklusport.suscripciones.entity.BeneficioPlan;
-import com.inklusport.suscripciones.entity.Plan;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.exception.PlanNotFoundException;
-import com.inklusport.suscripciones.repository.BeneficioPlanRepository;
-import com.inklusport.suscripciones.repository.PlanRepository;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.dto.PlanRequest;
+import com.inklusport.subscriptions.dto.PlanResponse;
+import com.inklusport.subscriptions.entity.BeneficioPlan;
+import com.inklusport.subscriptions.entity.Plan;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.exception.PlanNotFoundException;
+import com.inklusport.subscriptions.repository.BeneficioPlanRepository;
+import com.inklusport.subscriptions.repository.PlanRepository;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

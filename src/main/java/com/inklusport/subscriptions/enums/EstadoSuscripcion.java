@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.enums;
+package com.inklusport.subscriptions.enums;
 
 public enum EstadoSuscripcion {
     ACTIVA,

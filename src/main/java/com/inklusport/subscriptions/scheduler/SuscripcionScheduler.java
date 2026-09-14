@@ -1,9 +1,9 @@
-package com.inklusport.suscripciones.scheduler;
+package com.inklusport.subscriptions.scheduler;
 
-import com.inklusport.suscripciones.entity.Suscripcion;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
-import com.inklusport.suscripciones.repository.SuscripcionRepository;
-import com.inklusport.suscripciones.service.EmailService;
+import com.inklusport.subscriptions.entity.Suscripcion;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.repository.SuscripcionRepository;
+import com.inklusport.subscriptions.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

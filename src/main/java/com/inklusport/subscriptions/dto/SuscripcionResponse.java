@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.dto;
+package com.inklusport.subscriptions.dto;
 
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

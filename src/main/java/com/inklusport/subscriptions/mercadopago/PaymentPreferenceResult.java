@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.mercadopago;
+package com.inklusport.subscriptions.mercadopago;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

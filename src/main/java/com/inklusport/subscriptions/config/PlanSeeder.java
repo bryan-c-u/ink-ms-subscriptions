@@ -1,9 +1,9 @@
-package com.inklusport.suscripciones.config;
+package com.inklusport.subscriptions.config;
 
-import com.inklusport.suscripciones.entity.BeneficioPlan;
-import com.inklusport.suscripciones.entity.Plan;
-import com.inklusport.suscripciones.repository.BeneficioPlanRepository;
-import com.inklusport.suscripciones.repository.PlanRepository;
+import com.inklusport.subscriptions.entity.BeneficioPlan;
+import com.inklusport.subscriptions.entity.Plan;
+import com.inklusport.subscriptions.repository.BeneficioPlanRepository;
+import com.inklusport.subscriptions.repository.PlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

@@ -1,7 +1,7 @@
-package com.inklusport.suscripciones.repository;
+package com.inklusport.subscriptions.repository;
 
-import com.inklusport.suscripciones.entity.Suscripcion;
-import com.inklusport.suscripciones.enums.EstadoSuscripcion;
+import com.inklusport.subscriptions.entity.Suscripcion;
+import com.inklusport.subscriptions.enums.EstadoSuscripcion;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

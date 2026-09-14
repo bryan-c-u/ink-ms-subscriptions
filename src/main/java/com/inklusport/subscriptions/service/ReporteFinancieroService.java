@@ -1,11 +1,11 @@
-package com.inklusport.suscripciones.service;
+package com.inklusport.subscriptions.service;
 
-import com.inklusport.suscripciones.dto.ReporteEventoItem;
-import com.inklusport.suscripciones.dto.ReporteFinancieroResponse;
-import com.inklusport.suscripciones.enums.EstadoPago;
-import com.inklusport.suscripciones.repository.ConfiguracionEventoPagoRepository;
-import com.inklusport.suscripciones.repository.PagoEventoRepository;
-import com.inklusport.suscripciones.repository.PagoSuscripcionRepository;
+import com.inklusport.subscriptions.dto.ReporteEventoItem;
+import com.inklusport.subscriptions.dto.ReporteFinancieroResponse;
+import com.inklusport.subscriptions.enums.EstadoPago;
+import com.inklusport.subscriptions.repository.ConfiguracionEventoPagoRepository;
+import com.inklusport.subscriptions.repository.PagoEventoRepository;
+import com.inklusport.subscriptions.repository.PagoSuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

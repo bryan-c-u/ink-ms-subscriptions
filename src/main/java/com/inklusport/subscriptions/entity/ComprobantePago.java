@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.entity;
+package com.inklusport.subscriptions.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

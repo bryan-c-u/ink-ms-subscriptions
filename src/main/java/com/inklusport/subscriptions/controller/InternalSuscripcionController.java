@@ -1,8 +1,8 @@
-package com.inklusport.suscripciones.controller;
+package com.inklusport.subscriptions.controller;
 
-import com.inklusport.suscripciones.dto.PuedeCrearEventoResponse;
-import com.inklusport.suscripciones.dto.SuscripcionResponse;
-import com.inklusport.suscripciones.service.SuscripcionService;
+import com.inklusport.subscriptions.dto.PuedeCrearEventoResponse;
+import com.inklusport.subscriptions.dto.SuscripcionResponse;
+import com.inklusport.subscriptions.service.SuscripcionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

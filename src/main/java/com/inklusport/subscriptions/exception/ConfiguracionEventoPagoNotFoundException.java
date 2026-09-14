@@ -1,4 +1,4 @@
-package com.inklusport.suscripciones.exception;
+package com.inklusport.subscriptions.exception;
 
 public class ConfiguracionEventoPagoNotFoundException extends RuntimeException {
     public ConfiguracionEventoPagoNotFoundException(String eventoId) {

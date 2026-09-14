@@ -1,6 +1,6 @@
-package com.inklusport.suscripciones.mercadopago;
+package com.inklusport.subscriptions.mercadopago;
 
-import com.inklusport.suscripciones.enums.EstadoPago;
+import com.inklusport.subscriptions.enums.EstadoPago;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
