@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,9 +28,10 @@ public class AdminSuscripcionController {
     private final SuscripcionService suscripcionService;
 
     @PatchMapping("/{id}/estado")
-    public ResponseEntity<SuscripcionResponse> cambiarEstado(@PathVariable Long id,
+    public ResponseEntity<SuscripcionResponse> cambiarEstado(@AuthenticationPrincipal String principal,
+                                                               @PathVariable Long id,
                                                                @Valid @RequestBody CambiarEstadoSuscripcionRequest request) {
-        return ResponseEntity.ok(suscripcionService.cambiarEstado(id, request.getEstado()));
+        return ResponseEntity.ok(suscripcionService.cambiarEstado(principal, id, request.getEstado(), request.getMotivo()));
     }
 
     @GetMapping("/organizadores/{organizadorId}/historial")
