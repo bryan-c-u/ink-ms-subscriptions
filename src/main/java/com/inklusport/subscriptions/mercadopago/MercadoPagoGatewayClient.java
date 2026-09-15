@@ -79,9 +79,13 @@ public class MercadoPagoGatewayClient implements PaymentGatewayClient {
             }
 
             Preference preference = new PreferenceClient().create(requestBuilder.build());
+            String checkoutUrl = preference.getSandboxInitPoint();
+            if (checkoutUrl == null || checkoutUrl.isBlank()) {
+                checkoutUrl = preference.getInitPoint();
+            }
             return PaymentPreferenceResult.builder()
                     .preferenceId(preference.getId())
-                    .checkoutUrl(preference.getInitPoint())
+                    .checkoutUrl(checkoutUrl)
                     .build();
         } catch (MPApiException e) {
             log.error("API Mercado Pago al crear preferencia: {}", e.getApiResponse().getContent());

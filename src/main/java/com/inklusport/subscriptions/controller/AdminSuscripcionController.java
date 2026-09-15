@@ -36,4 +36,15 @@ public class AdminSuscripcionController {
     public ResponseEntity<List<HistorialSuscripcionResponse>> historialPorOrganizador(@PathVariable String organizadorId) {
         return ResponseEntity.ok(suscripcionService.historialPorOrganizador(organizadorId));
     }
+
+    /**
+     * RF58: suscripciones del organizador para que el admin vea el estado vigente antes
+     * de aplicar una transicion. Usa listarPropias (solo lectura) y no obtenerActual,
+     * que le asignaria un plan gratuito automaticamente si el organizador aun no tiene
+     * ninguna suscripcion.
+     */
+    @GetMapping("/organizadores/{organizadorId}/suscripciones")
+    public ResponseEntity<List<SuscripcionResponse>> suscripcionesPorOrganizador(@PathVariable String organizadorId) {
+        return ResponseEntity.ok(suscripcionService.listarPropias(organizadorId));
+    }
 }
