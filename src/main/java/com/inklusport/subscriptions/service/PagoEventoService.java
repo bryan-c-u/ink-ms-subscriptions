@@ -151,7 +151,10 @@ public class PagoEventoService {
         pagoEventoRepository.save(pago);
 
         if (status.getEstado() == EstadoPago.APROBADO) {
-            sportsServiceClient.confirmarInscripcionPagada(pago.getUsuarioId(), pago.getEventoId());
+            // ink-ms-sports guarda las inscripciones por email (no por UUID de
+            // ink-ms-users), igual que registerToEvent(): hay que resolver antes de llamar.
+            String emailUsuario = organizerIdentityService.resolveEmail(pago.getUsuarioId());
+            sportsServiceClient.confirmarInscripcionPagada(emailUsuario, pago.getEventoId());
             try {
                 ComprobantePago comprobante = comprobanteService.generarComprobanteEvento(
                         pago, "Inscripcion a evento " + pago.getEventoId());
