@@ -51,13 +51,6 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
-		<!-- Carga variables desde .env (mismo mecanismo que ink-ms-suscripciones / auth / users) -->
-		<dependency>
-			<groupId>me.paulschwarz</groupId>
-			<artifactId>spring-dotenv</artifactId>
-			<version>4.0.0</version>
-		</dependency>
-
 		<!-- JWT (misma version que Auth MS / Users MS / ink-ms-suscripciones) -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>

@@ -2,6 +2,14 @@ spring:
   application:
     name: ink-ms-subscriptions
 
+  # spring-dotenv no carga el .env con esta version de Spring Boot (incompatibilidad
+  # confirmada). Se reemplaza por el mecanismo nativo de Boot: el .env usa sintaxis
+  # KEY=VALUE identica a un .properties, asi que basta con indicarle el formato con
+  # el sufijo [.properties]. "optional:" evita que falle si el archivo no existe
+  # (por ejemplo en el perfil docker, donde las variables vienen del compose).
+  config:
+    import: optional:file:.env[.properties]
+
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
     username: ${DB_USERNAME:root}
