@@ -146,21 +146,26 @@ public class PagoEventoService {
                     datos.getInstallments(), datos.getPaymentMethodId(), payerEmail,
                     datos.getDocType(), datos.getDocNumber());
 
-            // Guardar la transacción ya con payment id (evita índice único con null).
-            TransaccionPasarela tx = new TransaccionPasarela();
-            tx.setPasarela("mock".equalsIgnoreCase(paymentMode) ? Pasarela.MOCK : Pasarela.MERCADOPAGO);
-            tx.setTipo(TipoTransaccion.INSCRIPCION_EVENTO);
-            tx.setReferenciaExterna(referencia);
-            tx.setMoneda(pago.getMoneda());
-            tx.setMonto(pago.getMonto());
-            tx.setPagoExternoId(status.getPaymentIdExterno());
-            tx.setEstadoPasarela(status.getEstadoPasarela());
-            tx.setDetalleEstado(status.getDetalleEstado());
-            tx.setMetodoPago(status.getMetodoPago());
-            tx.setTipoPago(status.getTipoPago());
-            tx = transaccionPasarelaRepository.save(tx);
-            pago.setTransaccionId(tx.getId());
-            pagoEventoRepository.save(pago);
+            // Auditoría de pasarela: no debe impedir confirmar la inscripción si MP ya cobró.
+            try {
+                TransaccionPasarela tx = new TransaccionPasarela();
+                tx.setPasarela("mock".equalsIgnoreCase(paymentMode) ? Pasarela.MOCK : Pasarela.MERCADOPAGO);
+                tx.setTipo(TipoTransaccion.INSCRIPCION_EVENTO);
+                tx.setReferenciaExterna(referencia);
+                tx.setMoneda(pago.getMoneda());
+                tx.setMonto(pago.getMonto());
+                tx.setPagoExternoId(status.getPaymentIdExterno());
+                tx.setEstadoPasarela(status.getEstadoPasarela());
+                tx.setDetalleEstado(status.getDetalleEstado());
+                tx.setMetodoPago(status.getMetodoPago());
+                tx.setTipoPago(status.getTipoPago());
+                tx = transaccionPasarelaRepository.save(tx);
+                pago.setTransaccionId(tx.getId());
+                pagoEventoRepository.save(pago);
+            } catch (RuntimeException e) {
+                log.error("Cobro PE {} OK en pasarela pero falló guardar transaccion_pasarela: {}",
+                        referencia, e.getMessage(), e);
+            }
 
             confirmarPago(status);
         }
