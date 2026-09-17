@@ -2,101 +2,108 @@ package com.inklusport.subscriptions.entity;
 
 import com.inklusport.subscriptions.enums.EstadoSuscripcion;
 import com.inklusport.subscriptions.enums.OrigenSuscripcion;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "suscripcion")
+/**
+ * RF56 / RF57 / RF58 / RF59 / RF64 — suscripción del organizador.
+ * Los campos {@code *Aplicado} congelan las condiciones del ciclo vigente (RF65), por eso
+ * el plan se guarda como referencia ({@code plan_id}) más el nombre del momento de la
+ * contratación: cambiar el catálogo no altera un ciclo ya cobrado.
+ */
+@Document(collection = "suscripcion")
+@CompoundIndex(name = "idx_suscripcion_estado_fin", def = "{'estado': 1, 'fecha_fin': 1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Suscripcion {
+public class Suscripcion implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "organizador_id", nullable = false, length = 100)
+    @Indexed
+    @Field("organizador_id")
     private String organizadorId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id", nullable = false)
-    private Plan plan;
+    @Field("plan_id")
+    private Long planId;
 
-    @Column(name = "precio_aplicado", nullable = false, precision = 12, scale = 2)
+    /** Nombre del plan en el momento de aplicar los términos (snapshot de RF65). */
+    @Field("plan_nombre")
+    private String planNombre;
+
+    @Field("precio_aplicado")
     private BigDecimal precioAplicado;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
-    @Column(name = "limite_eventos_aplicado")
+    @Field("limite_eventos_aplicado")
     private Integer limiteEventosAplicado;
 
-    @Column(name = "porcentaje_comision_aplicado", nullable = false, precision = 5, scale = 2)
+    @Field("porcentaje_comision_aplicado")
     private BigDecimal porcentajeComisionAplicado;
 
-    @Column(name = "duracion_dias_aplicada", nullable = false)
+    @Field("duracion_dias_aplicada")
     private Integer duracionDiasAplicada;
 
-    @Column(name = "fecha_inicio", nullable = false)
+    @Field("fecha_inicio")
     private LocalDate fechaInicio;
 
-    @Column(name = "fecha_fin", nullable = false)
+    @Field("fecha_fin")
     private LocalDate fechaFin;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
     private EstadoSuscripcion estado = EstadoSuscripcion.ACTIVA;
 
-    @Column(name = "eventos_creados_periodo", nullable = false)
+    @Field("eventos_creados_periodo")
     private Integer eventosCreadosPeriodo = 0;
 
-    @Column(name = "periodo_inicio", nullable = false)
+    /** Inicio del mes/ciclo de conteo de eventos (RF58). */
+    @Field("periodo_inicio")
     private LocalDate periodoInicio;
 
-    @Column(name = "renovacion_automatica", nullable = false)
+    @Field("renovacion_automatica")
     private Boolean renovacionAutomatica = false;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
     private OrigenSuscripcion origen = OrigenSuscripcion.COMPRA;
 
-    @Column(name = "fecha_cancelacion")
+    @Field("fecha_cancelacion")
     private LocalDateTime fechaCancelacion;
 
-    @Column(name = "motivo_cancelacion", length = 500)
+    @Field("motivo_cancelacion")
     private String motivoCancelacion;
 
-    @Column(name = "fecha_suspension")
+    @Field("fecha_suspension")
     private LocalDateTime fechaSuspension;
 
-    @Column(name = "motivo_suspension", length = 500)
+    @Field("motivo_suspension")
     private String motivoSuspension;
 
-    @Column(name = "fecha_ultima_renovacion")
+    @Field("fecha_ultima_renovacion")
     private LocalDate fechaUltimaRenovacion;
 
-    @CreationTimestamp
-    @Column(name = "fecha_creacion", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_creacion")
     private LocalDateTime fechaCreacion;
 
-    @UpdateTimestamp
-    @Column(name = "fecha_actualizacion", nullable = false)
+    @LastModifiedDate
+    @Field("fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
     public void aplicarTerminos(Plan plan) {
-        this.plan = plan;
+        this.planId = plan.getId();
+        this.planNombre = plan.getNombre();
         this.precioAplicado = plan.getPrecio();
         this.moneda = plan.getMoneda() != null ? plan.getMoneda() : "COP";
         this.limiteEventosAplicado = plan.getLimiteEventosMes();

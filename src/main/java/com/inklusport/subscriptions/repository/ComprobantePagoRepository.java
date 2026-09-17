@@ -1,11 +1,11 @@
 package com.inklusport.subscriptions.repository;
 
 import com.inklusport.subscriptions.entity.ComprobantePago;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface ComprobantePagoRepository extends JpaRepository<ComprobantePago, Long> {
+public interface ComprobantePagoRepository extends MongoRepository<ComprobantePago, Long> {
 
     Optional<ComprobantePago> findByPagoEventoId(Long pagoEventoId);
 

@@ -1,13 +1,13 @@
 package com.inklusport.subscriptions.repository;
 
 import com.inklusport.subscriptions.entity.NotificacionVencimiento;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-public interface NotificacionVencimientoRepository extends JpaRepository<NotificacionVencimiento, Long> {
+public interface NotificacionVencimientoRepository extends MongoRepository<NotificacionVencimiento, Long> {
 
     Optional<NotificacionVencimiento> findBySuscripcionIdAndDiasAntesAndFechaProgramada(
             Long suscripcionId, Integer diasAntes, LocalDate fechaProgramada);

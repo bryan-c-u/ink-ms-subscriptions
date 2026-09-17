@@ -4,6 +4,7 @@ import com.inklusport.subscriptions.client.SportsServiceClient;
 import com.inklusport.subscriptions.dto.PagoCheckoutResponse;
 import com.inklusport.subscriptions.dto.PagoEstadoResponse;
 import com.inklusport.subscriptions.dto.PagoEventoResponse;
+import com.inklusport.subscriptions.dto.PagoTarjetaRequest;
 import com.inklusport.subscriptions.entity.ComprobantePago;
 import com.inklusport.subscriptions.entity.ConfiguracionEventoPago;
 import com.inklusport.subscriptions.entity.PagoEvento;
@@ -14,7 +15,6 @@ import com.inklusport.subscriptions.enums.TipoTransaccion;
 import com.inklusport.subscriptions.exception.EventoNoConfiguradoComoPagoException;
 import com.inklusport.subscriptions.exception.InscripcionDuplicadaException;
 import com.inklusport.subscriptions.exception.PagoNotFoundException;
-import com.inklusport.subscriptions.mercadopago.PaymentPreferenceResult;
 import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
 import com.inklusport.subscriptions.repository.PagoEventoRepository;
@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -32,7 +31,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de pagos e inscripciones a eventos.
+ * Servicio de pagos e inscripciones a eventos (RF57).
+ * Checkout de inscripción cuando el evento tiene configuración {@code esPago};
+ * el cobro aplica también a la primera inscripción del atleta.
  */
 @Service
 @RequiredArgsConstructor
@@ -55,20 +56,40 @@ public class PagoEventoService {
     private String paymentMode;
 
     /**
-     * Inicia la inscripción de pago a un evento y crea el checkout.
-     *
-     * @param usuarioId identificador del usuario
-     * @param eventoId  identificador del evento
-     * @return datos de checkout del pago
+     * Inicia la inscripción de pago a un evento (RF57 / RF70).
+     * Solo crea el pago PENDIENTE; el cobro ocurre en el checkout propio de InkluSport
+     * ({@link #pagarConTarjeta}), igual que las suscripciones — sin redirect a Checkout Pro.
      */
-    @Transactional
     public PagoCheckoutResponse inscribirse(String usuarioId, String eventoId) {
         ConfiguracionEventoPago config = configuracionEventoPagoService.obtenerEntidadPorEvento(eventoId);
         if (!Boolean.TRUE.equals(config.getEsPago())) {
             throw new EventoNoConfiguradoComoPagoException(eventoId);
         }
-        pagoEventoRepository.findByUsuarioIdAndEventoIdAndEstado(usuarioId, eventoId, EstadoPago.APROBADO)
+        pagoEventoRepository
+                .findByUsuarioIdAndEventoIdAndEstadoOrderByIdDesc(usuarioId, eventoId, EstadoPago.APROBADO)
+                .stream()
+                .findFirst()
                 .ifPresent(p -> { throw new InscripcionDuplicadaException(usuarioId, eventoId); });
+
+        // Reutilizar el PENDIENTE más reciente; si hay duplicados de intentos fallidos, se cancelan.
+        List<PagoEvento> pendientes = pagoEventoRepository
+                .findByUsuarioIdAndEventoIdAndEstadoOrderByIdDesc(usuarioId, eventoId, EstadoPago.PENDIENTE);
+        if (!pendientes.isEmpty()) {
+            PagoEvento pago = pendientes.get(0);
+            for (int i = 1; i < pendientes.size(); i++) {
+                PagoEvento dup = pendientes.get(i);
+                dup.setEstado(EstadoPago.CANCELADO);
+                pagoEventoRepository.save(dup);
+                log.info("Pago evento duplicado {} cancelado (queda {})", dup.getId(), pago.getId());
+            }
+            return PagoCheckoutResponse.builder()
+                    .pagoId(pago.getId())
+                    .monto(pago.getMonto())
+                    .estado(pago.getEstado())
+                    .referenciaTransaccion(pago.getReferenciaTransaccion())
+                    .checkoutUrl(null)
+                    .build();
+        }
 
         BigDecimal monto = config.getValorInscripcion();
         BigDecimal porcentaje = config.getPorcentajeComision() != null ? config.getPorcentajeComision() : BigDecimal.ZERO;
@@ -78,6 +99,7 @@ public class PagoEventoService {
         pago.setUsuarioId(usuarioId);
         pago.setEventoId(eventoId);
         pago.setOrganizadorId(config.getOrganizadorId());
+        pago.setNombreEvento(sportsServiceClient.obtenerNombreEvento(eventoId));
         pago.setMonto(monto);
         pago.setMoneda(config.getMoneda() != null ? config.getMoneda() : "COP");
         pago.setPorcentajeComision(porcentaje);
@@ -88,37 +110,62 @@ public class PagoEventoService {
 
         String referencia = PREFIJO_REFERENCIA + pago.getId();
         pago.setReferenciaTransaccion(referencia);
-
-        PaymentPreferenceResult preferencia = paymentGatewayClient.crearPreferencia(
-                "Inscripcion a evento InkluSport", monto, referencia);
-
-        TransaccionPasarela tx = new TransaccionPasarela();
-        tx.setPasarela("mock".equalsIgnoreCase(paymentMode) ? Pasarela.MOCK : Pasarela.MERCADOPAGO);
-        tx.setTipo(TipoTransaccion.INSCRIPCION_EVENTO);
-        tx.setPreferenciaId(preferencia.getPreferenceId());
-        tx.setReferenciaExterna(referencia);
-        tx.setMoneda(pago.getMoneda());
-        tx.setMonto(monto);
-        tx.setUrlCheckout(preferencia.getCheckoutUrl());
-        tx.setEstadoPasarela("pending");
-        tx = transaccionPasarelaRepository.save(tx);
-        pago.setTransaccion(tx);
         pago = pagoEventoRepository.save(pago);
-
-        if ("mock".equalsIgnoreCase(paymentMode)) {
-            PaymentStatusResult mock = paymentGatewayClient.consultarPago(preferencia.getPreferenceId());
-            mock.setReferenciaExterna(referencia);
-            confirmarPago(mock);
-            pago = pagoEventoRepository.findById(pago.getId()).orElse(pago);
-        }
 
         return PagoCheckoutResponse.builder()
                 .pagoId(pago.getId())
                 .monto(pago.getMonto())
                 .estado(pago.getEstado())
                 .referenciaTransaccion(referencia)
-                .checkoutUrl(preferencia.getCheckoutUrl())
+                .checkoutUrl(null)
                 .build();
+    }
+
+    /**
+     * Cobra un pago de inscripción PENDIENTE con el token de tarjeta del formulario
+     * embebido en InkluSport (RF70). Confirma inscripción en sports si MP aprueba.
+     */
+    public PagoEstadoResponse pagarConTarjeta(String principal, String referencia, PagoTarjetaRequest datos,
+                                               boolean esAdmin) {
+        PagoEvento pago = pagoEventoRepository.findByReferenciaTransaccion(referencia)
+                .orElseThrow(() -> new PagoNotFoundException(
+                        "No se encontro el pago de evento con referencia: " + referencia));
+
+        String usuarioId = organizerIdentityService.resolveUserId(principal);
+        if (!esAdmin && !pago.getUsuarioId().equals(usuarioId)) {
+            throw new AccessDeniedException("No tienes acceso a este pago");
+        }
+
+        if (pago.getEstado() == EstadoPago.PENDIENTE) {
+            String payerEmail = organizerIdentityService.resolveEmail(principal);
+            String titulo = "Inscripcion InkluSport - "
+                    + (pago.getNombreEvento() != null ? pago.getNombreEvento() : pago.getEventoId());
+
+            PaymentStatusResult status = paymentGatewayClient.procesarPago(
+                    datos.getCardToken(), pago.getMonto(), referencia, titulo,
+                    datos.getInstallments(), datos.getPaymentMethodId(), payerEmail,
+                    datos.getDocType(), datos.getDocNumber());
+
+            // Guardar la transacción ya con payment id (evita índice único con null).
+            TransaccionPasarela tx = new TransaccionPasarela();
+            tx.setPasarela("mock".equalsIgnoreCase(paymentMode) ? Pasarela.MOCK : Pasarela.MERCADOPAGO);
+            tx.setTipo(TipoTransaccion.INSCRIPCION_EVENTO);
+            tx.setReferenciaExterna(referencia);
+            tx.setMoneda(pago.getMoneda());
+            tx.setMonto(pago.getMonto());
+            tx.setPagoExternoId(status.getPaymentIdExterno());
+            tx.setEstadoPasarela(status.getEstadoPasarela());
+            tx.setDetalleEstado(status.getDetalleEstado());
+            tx.setMetodoPago(status.getMetodoPago());
+            tx.setTipoPago(status.getTipoPago());
+            tx = transaccionPasarelaRepository.save(tx);
+            pago.setTransaccionId(tx.getId());
+            pagoEventoRepository.save(pago);
+
+            confirmarPago(status);
+        }
+
+        return estadoActual(principal, referencia, esAdmin);
     }
 
     /**
@@ -126,7 +173,6 @@ public class PagoEventoService {
      *
      * @param status resultado consultado en la pasarela
      */
-    @Transactional
     public void confirmarPago(PaymentStatusResult status) {
         PagoEvento pago = pagoEventoRepository.findByReferenciaTransaccion(status.getReferenciaExterna())
                 .orElseThrow(() -> new PagoNotFoundException(
@@ -139,14 +185,17 @@ public class PagoEventoService {
 
         pago.setEstado(status.getEstado());
         pago.setMetodoPago(status.getMetodoPago());
-        if (pago.getTransaccion() != null) {
-            TransaccionPasarela tx = pago.getTransaccion();
-            tx.setPagoExternoId(status.getPaymentIdExterno());
-            tx.setEstadoPasarela(status.getEstadoPasarela());
-            tx.setDetalleEstado(status.getDetalleEstado());
-            tx.setMetodoPago(status.getMetodoPago());
-            tx.setTipoPago(status.getTipoPago());
-            transaccionPasarelaRepository.save(tx);
+        if (pago.getTransaccionId() != null) {
+            transaccionPasarelaRepository.findById(pago.getTransaccionId()).ifPresent(tx -> {
+                if (status.getPaymentIdExterno() != null && !status.getPaymentIdExterno().isBlank()) {
+                    tx.setPagoExternoId(status.getPaymentIdExterno());
+                }
+                tx.setEstadoPasarela(status.getEstadoPasarela());
+                tx.setDetalleEstado(status.getDetalleEstado());
+                tx.setMetodoPago(status.getMetodoPago());
+                tx.setTipoPago(status.getTipoPago());
+                transaccionPasarelaRepository.save(tx);
+            });
         }
         pagoEventoRepository.save(pago);
 
@@ -157,7 +206,8 @@ public class PagoEventoService {
             sportsServiceClient.confirmarInscripcionPagada(emailUsuario, pago.getEventoId());
             try {
                 ComprobantePago comprobante = comprobanteService.generarComprobanteEvento(
-                        pago, "Inscripcion a evento " + pago.getEventoId());
+                        pago, "Inscripcion a evento " + (pago.getNombreEvento() != null
+                                ? pago.getNombreEvento() : pago.getEventoId()));
                 emailService.enviarComprobantePago(
                         organizerIdentityService.resolveEmail(pago.getUsuarioId()),
                         comprobante.getNumeroComprobante(),
@@ -173,12 +223,11 @@ public class PagoEventoService {
      * con verificacion de propiedad (el usuario solo ve los suyos; un ADMIN, todos).
      * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
      */
-    @Transactional(readOnly = true)
     public PagoEstadoResponse estadoActual(String email, String referencia, boolean esAdmin) {
         PagoEvento pago = pagoEventoRepository.findByReferenciaTransaccion(referencia)
                 .orElseThrow(() -> new PagoNotFoundException(
                         "No se encontro el pago de evento con referencia: " + referencia));
-        if (!esAdmin && !pago.getUsuarioId().equals(email)) {
+        if (!esAdmin && !pago.getUsuarioId().equals(organizerIdentityService.resolveUserId(email))) {
             throw new AccessDeniedException("No tienes acceso a este pago");
         }
         return PagoEstadoResponse.builder()
@@ -198,9 +247,20 @@ public class PagoEventoService {
      * @param usuarioId identificador del usuario
      * @return pagos ordenados por fecha descendente
      */
-    @Transactional(readOnly = true)
     public List<PagoEventoResponse> historialUsuario(String usuarioId) {
         return pagoEventoRepository.findByUsuarioIdOrderByFechaPagoDesc(usuarioId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * RF66: ingresos por inscripción que recibió el organizador (denormalizado en organizador_id).
+     *
+     * @param organizadorId identificador del organizador
+     * @return pagos de sus eventos, más recientes primero
+     */
+    public List<PagoEventoResponse> historialOrganizador(String organizadorId) {
+        return pagoEventoRepository.findByOrganizadorIdOrderByFechaPagoDesc(organizadorId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -213,11 +273,12 @@ public class PagoEventoService {
      * @param esAdmin     {@code true} si el solicitante es administrador
      * @return archivo PDF del comprobante
      */
-    @Transactional(readOnly = true)
     public java.io.File obtenerComprobante(Long pagoId, String requesterId, boolean esAdmin) {
         PagoEvento pago = pagoEventoRepository.findById(pagoId)
                 .orElseThrow(() -> new PagoNotFoundException("No se encontro el pago de evento con id: " + pagoId));
-        if (!esAdmin && !pago.getUsuarioId().equals(requesterId)) {
+        if (!esAdmin
+                && !pago.getUsuarioId().equals(requesterId)
+                && !pago.getOrganizadorId().equals(requesterId)) {
             throw new AccessDeniedException("No tienes acceso a este comprobante");
         }
         ComprobantePago comprobante = comprobantePagoRepository.findByPagoEventoId(pagoId)
@@ -241,7 +302,10 @@ public class PagoEventoService {
                 .id(pago.getId())
                 .usuarioId(pago.getUsuarioId())
                 .eventoId(pago.getEventoId())
+                .organizadorId(pago.getOrganizadorId())
+                .nombreEvento(pago.getNombreEvento())
                 .monto(pago.getMonto())
+                .moneda(pago.getMoneda())
                 .metodoPago(pago.getMetodoPago())
                 .referenciaTransaccion(pago.getReferenciaTransaccion())
                 .estado(pago.getEstado())

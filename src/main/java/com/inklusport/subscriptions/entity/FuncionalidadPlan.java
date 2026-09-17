@@ -1,36 +1,34 @@
 package com.inklusport.subscriptions.entity;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
-@Entity
-@Table(name = "funcionalidad_plan", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_funcionalidad_plan", columnNames = {"plan_id", "codigo"})
-})
+/** RF58 / RF54: funcionalidades y cupos extra del plan, además de eventos/mes. */
+@Document(collection = "funcionalidad_plan")
+@CompoundIndex(name = "uk_funcionalidad_plan", def = "{'plan_id': 1, 'codigo': 1}", unique = true)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class FuncionalidadPlan {
+public class FuncionalidadPlan implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id", nullable = false)
-    private Plan plan;
+    @Field("plan_id")
+    private Long planId;
 
-    @Column(nullable = false, length = 50)
+    /** EVENTOS_PAGOS, REPORTES_FINANCIEROS, SOPORTE_PRIORITARIO, ... */
     private String codigo;
 
-    @Column(nullable = false, length = 100)
     private String nombre;
 
-    @Column(nullable = false)
     private Boolean habilitada = true;
 
-    @Column
+    /** {@code null} = sin cupo numérico (flag on/off). */
     private Integer limite;
 }

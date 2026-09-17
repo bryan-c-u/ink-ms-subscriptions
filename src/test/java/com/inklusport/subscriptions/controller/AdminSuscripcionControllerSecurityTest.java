@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,9 +51,8 @@ class AdminSuscripcionControllerSecurityTest {
 
     @Test
     void cambiarEstado_conTokenAdmin_devuelve200() throws Exception {
-        when(suscripcionService.cambiarEstado(1L, EstadoSuscripcion.SUSPENDIDA)).thenReturn(
-                SuscripcionResponse.builder().id(1L).estado(EstadoSuscripcion.SUSPENDIDA).build()
-        );
+        when(suscripcionService.cambiarEstado(any(), eq(1L), eq(EstadoSuscripcion.SUSPENDIDA), any()))
+                .thenReturn(SuscripcionResponse.builder().id(1L).estado(EstadoSuscripcion.SUSPENDIDA).build());
 
         String token = jwtTokenProvider.generateToken("admin@test.com", List.of("ADMIN"));
 

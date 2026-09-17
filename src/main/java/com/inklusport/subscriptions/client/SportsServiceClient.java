@@ -7,6 +7,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Map;
+
 /**
  * Confirma en sports-ms la inscripción tras un pago de evento aprobado.
  */
@@ -18,6 +20,35 @@ public class SportsServiceClient {
 
     @Value("${sports.service.url:http://localhost:3003}")
     private String sportsServiceUrl;
+
+    /**
+     * Nombre del evento para el snapshot de {@code pago_evento.nombre_evento} (RF66).
+     * Si sports-ms no responde, el pago se crea igual y el historial muestra el id.
+     *
+     * @param eventoId identificador del evento
+     * @return nombre, o {@code null}
+     */
+    public String obtenerNombreEvento(String eventoId) {
+        if (eventoId == null || eventoId.isBlank()) {
+            return null;
+        }
+        try {
+            Map<?, ?> body = restTemplate.getForObject(
+                    sportsServiceUrl + "/api/events/{id}", Map.class, eventoId);
+            if (body == null) {
+                return null;
+            }
+            Object nombre = body.get("name");
+            if (nombre == null) {
+                return null;
+            }
+            String value = String.valueOf(nombre).trim();
+            return value.isEmpty() ? null : value;
+        } catch (Exception e) {
+            log.debug("No se resolvió el nombre del evento {}: {}", eventoId, e.getMessage());
+            return null;
+        }
+    }
 
     public void confirmarInscripcionPagada(String usuarioId, String eventoId) {
         if (usuarioId == null || eventoId == null) {

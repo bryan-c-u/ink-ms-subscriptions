@@ -37,6 +37,8 @@ class SuscripcionServiceTest {
     private PlanService planService;
     @Mock
     private PagoSuscripcionService pagoSuscripcionService;
+    @Mock
+    private OrganizerIdentityService organizerIdentityService;
 
     @InjectMocks
     private SuscripcionService suscripcionService;

@@ -1,18 +1,12 @@
 spring:
-  datasource:
-    url: jdbc:h2:mem:subscriptions_test;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    open-in-view: false
-    properties:
-      hibernate:
-        # Sobreescribe el MySQLDialect heredado de application.yaml: H2 no entiende la
-        # sintaxis MySQL (auto_increment, engine=InnoDB) que ese dialecto genera.
-        dialect: org.hibernate.dialect.H2Dialect
+  mongodb:
+    uri: mongodb://localhost:27017/inklusport_subscriptions_test
+    database: inklusport_subscriptions_test
+  data:
+    mongodb:
+      # Sin creación de índices el contexto de Spring arranca sin conectarse a Mongo, que
+      # es lo único que necesitan las pruebas (unitarias con Mockito y @WebMvcTest).
+      auto-index-creation: false
   mail:
     host: localhost
     port: 3025

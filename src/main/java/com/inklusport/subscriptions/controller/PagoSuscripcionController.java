@@ -1,5 +1,6 @@
 package com.inklusport.subscriptions.controller;
 
+import com.inklusport.subscriptions.dto.PagoSuscripcionResponse;
 import com.inklusport.subscriptions.service.OrganizerIdentityService;
 import com.inklusport.subscriptions.service.PagoSuscripcionService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.File;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/pagos/suscripciones")
@@ -24,6 +26,12 @@ public class PagoSuscripcionController {
 
     private final PagoSuscripcionService pagoSuscripcionService;
     private final OrganizerIdentityService organizerIdentityService;
+
+    @GetMapping("/historial")
+    public ResponseEntity<List<PagoSuscripcionResponse>> historial(@AuthenticationPrincipal String principal) {
+        return ResponseEntity.ok(pagoSuscripcionService.listarPorOrganizador(
+                organizerIdentityService.resolveUserId(principal)));
+    }
 
     @GetMapping("/{pagoId}/comprobante")
     public ResponseEntity<Resource> descargarComprobante(@AuthenticationPrincipal String principal,

@@ -1,80 +1,71 @@
 package com.inklusport.subscriptions.entity;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
-@Entity
-@Table(name = "plan")
+/**
+ * RF54 / RF64 / RF65 — catálogo de planes.
+ * {@code activo=false} oculta el plan a nuevos organizadores; las suscripciones ya
+ * contratadas siguen usando el snapshot guardado en {@link Suscripcion}.
+ */
+@Document(collection = "plan")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Plan {
+public class Plan implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100, unique = true)
+    @Indexed(unique = true)
     private String nombre;
 
-    @Column(columnDefinition = "TEXT")
     private String descripcion;
 
-    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal precio = BigDecimal.ZERO;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
-    @Column(name = "limite_eventos_mes")
+    @Field("limite_eventos_mes")
     private Integer limiteEventosMes;
 
-    @Column(name = "porcentaje_comision", nullable = false, precision = 5, scale = 2)
+    @Field("porcentaje_comision")
     private BigDecimal porcentajeComision = BigDecimal.ZERO;
 
-    @Column(name = "duracion_dias", nullable = false)
+    @Field("duracion_dias")
     private Integer duracionDias = 30;
 
-    @Column(nullable = false)
+    @Indexed
     private Boolean activo = true;
 
-    @Column(name = "es_gratuito", nullable = false)
+    @Field("es_gratuito")
     private Boolean esGratuito = false;
 
-    @Column(name = "es_plan_inicial", nullable = false)
+    /** RF64: se asigna al registrar un organizador. */
+    @Field("es_plan_inicial")
     private Boolean esPlanInicial = false;
 
-    @CreationTimestamp
-    @Column(name = "fecha_creacion", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_creacion")
     private LocalDateTime fechaCreacion;
 
-    @UpdateTimestamp
-    @Column(name = "fecha_actualizacion", nullable = false)
+    @LastModifiedDate
+    @Field("fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "creado_por", length = 36)
+    @Field("creado_por")
     private String creadoPor;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "actualizado_por", length = 36)
+    @Field("actualizado_por")
     private String actualizadoPor;
-
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<BeneficioPlan> beneficios = new ArrayList<>();
-
-    @OneToMany(mappedBy = "plan", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<FuncionalidadPlan> funcionalidades = new ArrayList<>();
 }

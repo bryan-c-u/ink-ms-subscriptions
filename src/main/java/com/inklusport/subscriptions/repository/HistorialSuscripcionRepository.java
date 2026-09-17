@@ -1,13 +1,15 @@
 package com.inklusport.subscriptions.repository;
 
 import com.inklusport.subscriptions.entity.HistorialSuscripcion;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface HistorialSuscripcionRepository extends JpaRepository<HistorialSuscripcion, Long> {
+public interface HistorialSuscripcionRepository extends MongoRepository<HistorialSuscripcion, Long> {
 
     List<HistorialSuscripcion> findBySuscripcionIdOrderByFechaMovimientoDesc(Long suscripcionId);
 
-    List<HistorialSuscripcion> findBySuscripcion_OrganizadorIdOrderByFechaMovimientoDesc(String organizadorId);
+    List<HistorialSuscripcion> findByOrganizadorIdOrderByFechaMovimientoDesc(String organizadorId);
+
+    boolean existsBySuscripcionId(Long suscripcionId);
 }

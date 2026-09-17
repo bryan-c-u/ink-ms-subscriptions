@@ -1,11 +1,11 @@
 package com.inklusport.subscriptions.repository;
 
 import com.inklusport.subscriptions.entity.BeneficioPlan;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface BeneficioPlanRepository extends JpaRepository<BeneficioPlan, Long> {
+public interface BeneficioPlanRepository extends MongoRepository<BeneficioPlan, Long> {
 
     List<BeneficioPlan> findByPlanIdOrderByOrdenAsc(Long planId);
 

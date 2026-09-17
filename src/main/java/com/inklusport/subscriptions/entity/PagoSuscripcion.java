@@ -2,58 +2,60 @@ package com.inklusport.subscriptions.entity;
 
 import com.inklusport.subscriptions.enums.EstadoPago;
 import com.inklusport.subscriptions.enums.TipoPagoSuscripcion;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "pago_suscripcion")
+/**
+ * RF56 / RF59 — pagos de planes de organizador.
+ * {@code organizador_id} está duplicado desde la suscripción para poder validar la
+ * propiedad del pago sin una segunda lectura.
+ */
+@Document(collection = "pago_suscripcion")
+@CompoundIndex(name = "idx_pago_suscripcion", def = "{'suscripcion_id': 1, 'estado': 1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PagoSuscripcion {
+public class PagoSuscripcion implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "suscripcion_id", nullable = false)
-    private Suscripcion suscripcion;
+    @Field("suscripcion_id")
+    private Long suscripcionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaccion_id")
-    private TransaccionPasarela transaccion;
+    @Indexed
+    @Field("organizador_id")
+    private String organizadorId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Field("transaccion_id")
+    private Long transaccionId;
+
     private TipoPagoSuscripcion tipo = TipoPagoSuscripcion.NUEVA;
 
-    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal monto;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
-    @Column(name = "metodo_pago", length = 50)
+    @Field("metodo_pago")
     private String metodoPago;
 
-    @Column(name = "referencia_transaccion", length = 150)
+    @Indexed
+    @Field("referencia_transaccion")
     private String referenciaTransaccion;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
     private EstadoPago estado = EstadoPago.PENDIENTE;
 
-    @CreationTimestamp
-    @Column(name = "fecha_pago", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_pago")
     private LocalDateTime fechaPago;
 }

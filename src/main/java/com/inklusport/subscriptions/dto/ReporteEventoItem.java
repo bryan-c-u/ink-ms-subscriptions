@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ReporteEventoItem {
     private String eventoId;
+    private String nombreEvento;
     private long numeroInscritos;
     private BigDecimal montoTotal;
     private BigDecimal comisionEstimada;

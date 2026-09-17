@@ -34,6 +34,11 @@ public class AdminSuscripcionController {
         return ResponseEntity.ok(suscripcionService.cambiarEstado(principal, id, request.getEstado(), request.getMotivo()));
     }
 
+    @GetMapping
+    public ResponseEntity<List<SuscripcionResponse>> listarTodas() {
+        return ResponseEntity.ok(suscripcionService.listarTodas());
+    }
+
     @GetMapping("/organizadores/{organizadorId}/historial")
     public ResponseEntity<List<HistorialSuscripcionResponse>> historialPorOrganizador(@PathVariable String organizadorId) {
         return ResponseEntity.ok(suscripcionService.historialPorOrganizador(organizadorId));

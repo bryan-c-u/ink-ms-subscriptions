@@ -14,7 +14,6 @@ import com.inklusport.subscriptions.repository.PlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -37,7 +36,6 @@ public class PlanService {
      *
      * @return planes activos
      */
-    @Transactional(readOnly = true)
     public List<PlanResponse> listarActivos() {
         return planRepository.findByActivoTrue().stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -47,7 +45,6 @@ public class PlanService {
      *
      * @return catálogo completo de planes
      */
-    @Transactional(readOnly = true)
     public List<PlanResponse> listarTodos() {
         return planRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -58,7 +55,6 @@ public class PlanService {
      * @param id identificador del plan
      * @return plan encontrado
      */
-    @Transactional(readOnly = true)
     public PlanResponse obtenerPorId(Long id) {
         return toResponse(obtenerEntidad(id));
     }
@@ -69,7 +65,6 @@ public class PlanService {
      * @param id identificador del plan
      * @return entidad persistida
      */
-    @Transactional(readOnly = true)
     public Plan obtenerEntidad(Long id) {
         return planRepository.findById(id).orElseThrow(() -> new PlanNotFoundException(id));
     }
@@ -80,11 +75,13 @@ public class PlanService {
      * @param request datos del plan
      * @return plan creado
      */
-    @Transactional
     public PlanResponse crear(PlanRequest request) {
         Plan plan = new Plan();
         aplicarRequest(plan, request);
         plan.setActivo(true);
+        if (Boolean.TRUE.equals(plan.getEsPlanInicial())) {
+            desmarcarOtrosPlanesIniciales(null);
+        }
         plan = planRepository.save(plan);
         guardarBeneficios(plan, request.getBeneficios());
         log.info("Plan creado: {}", plan.getNombre());
@@ -98,7 +95,6 @@ public class PlanService {
      * @param request nuevos datos del plan
      * @return plan actualizado
      */
-    @Transactional
     public PlanResponse actualizar(Long id, PlanRequest request) {
         return actualizar(id, request, null);
     }
@@ -111,7 +107,6 @@ public class PlanService {
      * @param actorId usuario que realiza el cambio, o {@code null}
      * @return plan actualizado
      */
-    @Transactional
     public PlanResponse actualizar(Long id, PlanRequest request, String actorId) {
         Plan plan = obtenerEntidad(id);
         registrarCambio(plan, "precio", String.valueOf(plan.getPrecio()), String.valueOf(request.getPrecio()), actorId);
@@ -124,6 +119,9 @@ public class PlanService {
         registrarCambio(plan, "descripcion", plan.getDescripcion(), request.getDescripcion(), actorId);
 
         aplicarRequest(plan, request);
+        if (Boolean.TRUE.equals(plan.getEsPlanInicial())) {
+            desmarcarOtrosPlanesIniciales(plan.getId());
+        }
         plan = planRepository.save(plan);
 
         beneficioPlanRepository.deleteByPlanId(plan.getId());
@@ -137,13 +135,28 @@ public class PlanService {
      * @param id identificador del plan
      * @return plan desactivado
      */
-    @Transactional
     public PlanResponse desactivar(Long id) {
         Plan plan = obtenerEntidad(id);
         plan.setActivo(false);
         planRepository.save(plan);
         log.info("Plan desactivado: {}", plan.getNombre());
         return toResponse(plan);
+    }
+
+    /**
+     * El índice único de Mongo ({@code uk_plan_inicial}) solo admite un plan inicial.
+     * Hay que apagar el anterior antes de guardar el nuevo.
+     *
+     * @param planActualId plan que se está marcando como inicial, o {@code null} si aún no tiene id
+     */
+    private void desmarcarOtrosPlanesIniciales(Long planActualId) {
+        for (Plan otro : planRepository.findByEsPlanInicialTrue()) {
+            if (planActualId != null && planActualId.equals(otro.getId())) {
+                continue;
+            }
+            otro.setEsPlanInicial(false);
+            planRepository.save(otro);
+        }
     }
 
     /**
@@ -181,7 +194,7 @@ public class PlanService {
             return;
         }
         HistorialPlan h = new HistorialPlan();
-        h.setPlan(plan);
+        h.setPlanId(plan.getId());
         h.setCampoModificado(campo);
         h.setValorAnterior(anterior);
         h.setValorNuevo(nuevo);
@@ -205,7 +218,7 @@ public class PlanService {
                 continue;
             }
             BeneficioPlan bp = new BeneficioPlan();
-            bp.setPlan(plan);
+            bp.setPlanId(plan.getId());
             bp.setBeneficio(beneficio);
             bp.setOrden(++orden);
             beneficioPlanRepository.save(bp);

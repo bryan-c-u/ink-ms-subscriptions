@@ -2,17 +2,13 @@ package com.inklusport.subscriptions.repository;
 
 import com.inklusport.subscriptions.entity.Suscripcion;
 import com.inklusport.subscriptions.enums.EstadoSuscripcion;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-public interface SuscripcionRepository extends JpaRepository<Suscripcion, Long> {
+public interface SuscripcionRepository extends MongoRepository<Suscripcion, Long>, SuscripcionRepositoryCustom {
 
     Optional<Suscripcion> findFirstByOrganizadorIdOrderByFechaCreacionDesc(String organizadorId);
 
@@ -27,13 +23,5 @@ public interface SuscripcionRepository extends JpaRepository<Suscripcion, Long> 
 
     List<Suscripcion> findByEstado(EstadoSuscripcion estado);
 
-    @Modifying
-    @Transactional
-    @Query("UPDATE Suscripcion s SET s.eventosCreadosPeriodo = s.eventosCreadosPeriodo + 1 WHERE s.id = :id")
-    void incrementarEventosCreados(@Param("id") Long id);
-
-    @Modifying
-    @Transactional
-    @Query("UPDATE Suscripcion s SET s.eventosCreadosPeriodo = 0, s.periodoInicio = :periodoInicio WHERE s.estado = 'ACTIVA'")
-    void reiniciarContadorEventosMensual(@Param("periodoInicio") LocalDate periodoInicio);
+    List<Suscripcion> findAllByOrderByFechaCreacionDesc();
 }

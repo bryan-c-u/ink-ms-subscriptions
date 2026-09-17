@@ -1,66 +1,78 @@
 package com.inklusport.subscriptions.entity;
 
 import com.inklusport.subscriptions.enums.TipoMovimiento;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "historial_suscripcion")
+/**
+ * RF61: historial de altas, renovaciones, cambios de plan y estados.
+ * Guarda {@code organizador_id} además de la suscripción porque en Mongo no hay JOIN y el
+ * panel de administración consulta el historial por organizador.
+ */
+@Document(collection = "historial_suscripcion")
+@CompoundIndex(name = "idx_historial_suscripcion", def = "{'suscripcion_id': 1, 'fecha_movimiento': -1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class HistorialSuscripcion {
+public class HistorialSuscripcion implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "suscripcion_id", nullable = false)
-    private Suscripcion suscripcion;
+    @Field("suscripcion_id")
+    private Long suscripcionId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_movimiento", nullable = false, length = 30)
+    @Indexed
+    @Field("organizador_id")
+    private String organizadorId;
+
+    @Field("tipo_movimiento")
     private TipoMovimiento tipoMovimiento;
 
-    @Column(name = "plan_anterior_id")
+    @Field("plan_anterior_id")
     private Long planAnteriorId;
 
-    @Column(name = "plan_nuevo_id")
+    @Field("plan_anterior_nombre")
+    private String planAnteriorNombre;
+
+    @Field("plan_nuevo_id")
     private Long planNuevoId;
 
-    @Column(name = "estado_anterior", length = 20)
+    @Field("plan_nuevo_nombre")
+    private String planNuevoNombre;
+
+    @Field("estado_anterior")
     private String estadoAnterior;
 
-    @Column(name = "estado_nuevo", length = 20)
+    @Field("estado_nuevo")
     private String estadoNuevo;
 
-    @Column(name = "fecha_fin_anterior")
+    @Field("fecha_fin_anterior")
     private LocalDate fechaFinAnterior;
 
-    @Column(name = "fecha_fin_nueva")
+    @Field("fecha_fin_nueva")
     private LocalDate fechaFinNueva;
 
-    @Column(precision = 12, scale = 2)
     private BigDecimal monto;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "realizado_por", length = 36)
+    /** UUID del actor; {@code null} = sistema. */
+    @Field("realizado_por")
     private String realizadoPor;
 
-    @Column(length = 500)
     private String notas;
 
-    @CreationTimestamp
-    @Column(name = "fecha_movimiento", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_movimiento")
     private LocalDateTime fechaMovimiento;
 }

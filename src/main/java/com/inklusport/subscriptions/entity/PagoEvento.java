@@ -1,76 +1,80 @@
 package com.inklusport.subscriptions.entity;
 
 import com.inklusport.subscriptions.enums.EstadoPago;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "pago_evento")
+/**
+ * RF55 / RF57 / RF66 — inscripción pagada a un evento.
+ * Si el evento está configurado como de pago, el atleta paga la inscripción
+ * (incluida la primera vez); no hay alta gratuita previa al checkout.
+ * {@code inscripcion_id} apunta a {@code sports_events_ms.event_registration}
+ * (referencia lógica entre microservicios, sin integridad declarada).
+ */
+@Document(collection = "pago_evento")
+@CompoundIndex(name = "idx_pago_evento_usuario", def = "{'usuario_id': 1, 'fecha_pago': -1}")
+@CompoundIndex(name = "idx_pago_evento_evento", def = "{'evento_id': 1, 'estado': 1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PagoEvento {
+public class PagoEvento implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "usuario_id", nullable = false, length = 100)
+    @Field("usuario_id")
     private String usuarioId;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "evento_id", nullable = false, length = 36)
+    @Field("evento_id")
     private String eventoId;
 
-    @Column(name = "organizador_id", nullable = false, length = 100)
+    @Indexed
+    @Field("organizador_id")
     private String organizadorId;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "inscripcion_id", length = 36)
+    @Field("inscripcion_id")
     private String inscripcionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaccion_id")
-    private TransaccionPasarela transaccion;
+    @Field("transaccion_id")
+    private Long transaccionId;
 
-    @Column(name = "nombre_evento", length = 150)
+    /** Snapshot para el historial del usuario (RF66). */
+    @Field("nombre_evento")
     private String nombreEvento;
 
-    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal monto;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
-    @Column(name = "porcentaje_comision", nullable = false, precision = 5, scale = 2)
+    @Field("porcentaje_comision")
     private BigDecimal porcentajeComision = BigDecimal.ZERO;
 
-    @Column(name = "comision_plataforma", nullable = false, precision = 12, scale = 2)
+    @Field("comision_plataforma")
     private BigDecimal comisionPlataforma = BigDecimal.ZERO;
 
-    @Column(name = "monto_neto_organizador", nullable = false, precision = 12, scale = 2)
+    @Field("monto_neto_organizador")
     private BigDecimal montoNetoOrganizador = BigDecimal.ZERO;
 
-    @Column(name = "metodo_pago", length = 50)
+    @Field("metodo_pago")
     private String metodoPago;
 
-    @Column(name = "referencia_transaccion", length = 150)
+    @Indexed
+    @Field("referencia_transaccion")
     private String referenciaTransaccion;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
     private EstadoPago estado = EstadoPago.PENDIENTE;
 
-    @CreationTimestamp
-    @Column(name = "fecha_pago", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_pago")
     private LocalDateTime fechaPago;
 }

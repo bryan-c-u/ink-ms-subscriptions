@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 public class SuscripcionResponse {
     private Long id;
     private String organizadorId;
+    private String organizadorEmail;
     private Long planId;
     private String planNombre;
     private BigDecimal precioAplicado;

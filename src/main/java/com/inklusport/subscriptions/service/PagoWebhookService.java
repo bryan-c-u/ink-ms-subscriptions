@@ -8,7 +8,6 @@ import com.inklusport.subscriptions.repository.WebhookPasarelaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -31,7 +30,6 @@ public class PagoWebhookService {
      *
      * @param paymentIdExterno identificador externo del pago en la pasarela
      */
-    @Transactional
     public void procesarNotificacion(String paymentIdExterno) {
         WebhookPasarela logWebhook = new WebhookPasarela();
         logWebhook.setPasarela(Pasarela.MERCADOPAGO);
@@ -50,7 +48,7 @@ public class PagoWebhookService {
             }
 
             transaccionPasarelaRepository.findByReferenciaExterna(referencia)
-                    .ifPresent(logWebhook::setTransaccion);
+                    .ifPresent(tx -> logWebhook.setTransaccionId(tx.getId()));
 
             if (referencia.startsWith(PagoSuscripcionService.PREFIJO_REFERENCIA)) {
                 pagoSuscripcionService.confirmarPago(status);
