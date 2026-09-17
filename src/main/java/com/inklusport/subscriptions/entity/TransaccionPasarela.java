@@ -21,9 +21,15 @@ import java.time.LocalDateTime;
  * Un documento por intento de cobro: inscripción a evento o plan de organizador.
  */
 @Document(collection = "transaccion_pasarela")
-@CompoundIndex(name = "uk_preferencia", def = "{'pasarela': 1, 'preferencia_id': 1}", unique = true, sparse = true)
-// Sparse no basta: Mongo indexa null explícito y choca en el 2.º intento.
-// Solo exigir unicidad cuando ya hay un payment id real.
+// Checkout con tarjeta (RF70) no crea Preference de Checkout Pro: preferencia_id queda
+ // null. Un unique+sparse indexa ese null y el 2.º cobro explota con E11000.
+// Solo unicidad cuando hay preference id real (string).
+@CompoundIndex(
+        name = "uk_preferencia",
+        def = "{'pasarela': 1, 'preferencia_id': 1}",
+        unique = true,
+        partialFilter = "{ 'preferencia_id': { $type: 'string' } }"
+)
 @CompoundIndex(
         name = "uk_pago_externo",
         def = "{'pasarela': 1, 'pago_externo_id': 1}",
