@@ -73,6 +73,31 @@ public class ComprobanteService {
     }
 
     /**
+     * Si el PDF se perdió del disco (p. ej. contenedor recreado sin volumen), lo vuelve a generar
+     * con los datos del comprobante y actualiza {@code url_pdf}.
+     */
+    public File asegurarArchivo(ComprobantePago comprobante) {
+        File archivo = obtenerArchivo(comprobante);
+        if (archivo != null && archivo.exists()) {
+            return archivo;
+        }
+        File regenerado = generarPdf(
+                comprobante.getNumeroComprobante(),
+                comprobante.getDetalleEvento(),
+                comprobante.getMonto(),
+                comprobante.getMoneda(),
+                comprobante.getNumeroTransaccion(),
+                comprobante.getFechaGeneracion() != null ? comprobante.getFechaGeneracion() : LocalDateTime.now());
+        if (regenerado == null) {
+            return null;
+        }
+        comprobante.setUrlPdf(regenerado.getPath());
+        comprobantePagoRepository.save(comprobante);
+        log.warn("PDF del comprobante {} regenerado en {}", comprobante.getNumeroComprobante(), regenerado.getPath());
+        return regenerado;
+    }
+
+    /**
      * Crea el PDF, arma la entidad y la guarda.
      *
      * @param pagoEvento      pago de evento, o {@code null}
