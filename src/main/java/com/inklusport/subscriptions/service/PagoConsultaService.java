@@ -69,17 +69,18 @@ public class PagoConsultaService {
 
     /**
      * Checkout propio (RF70, sin interfaz de Mercado Pago): cobra un pago PENDIENTE con
-     * el token de tarjeta que genero el formulario embebido. Por ahora solo esta
-     * implementado para suscripciones ({@code PS-}); los eventos ({@code PE-}) siguen en
-     * Checkout Pro.
+     * el token de tarjeta que genero el formulario embebido. Soporta suscripciones
+     * ({@code PS-}) e inscripciones a eventos ({@code PE-}).
      */
     public PagoEstadoResponse pagarConTarjeta(String email, String referencia, PagoTarjetaRequest datos,
                                                boolean esAdmin) {
-        if (!referencia.startsWith(PagoSuscripcionService.PREFIJO_REFERENCIA)) {
-            throw new PagoNotFoundException(
-                    "El checkout con tarjeta propio todavia no soporta esta referencia: " + referencia);
+        if (referencia.startsWith(PagoSuscripcionService.PREFIJO_REFERENCIA)) {
+            return pagoSuscripcionService.pagarConTarjeta(email, referencia, datos, esAdmin);
         }
-        return pagoSuscripcionService.pagarConTarjeta(email, referencia, datos, esAdmin);
+        if (referencia.startsWith(PagoEventoService.PREFIJO_REFERENCIA)) {
+            return pagoEventoService.pagarConTarjeta(email, referencia, datos, esAdmin);
+        }
+        throw new PagoNotFoundException("Referencia de pago no reconocida: " + referencia);
     }
 
     private PagoEstadoResponse leer(boolean esSuscripcion, String email, String referencia, boolean esAdmin) {

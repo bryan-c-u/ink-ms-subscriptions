@@ -1,44 +1,43 @@
 package com.inklusport.subscriptions.entity;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "historial_plan")
+/** RF65: auditoría de cambios de catálogo (precio, límites, comisión, beneficios). */
+@Document(collection = "historial_plan")
+@CompoundIndex(name = "idx_historial_plan", def = "{'plan_id': 1, 'fecha_modificacion': -1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class HistorialPlan {
+public class HistorialPlan implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id", nullable = false)
-    private Plan plan;
+    @Field("plan_id")
+    private Long planId;
 
-    @Column(name = "campo_modificado", nullable = false, length = 80)
+    @Field("campo_modificado")
     private String campoModificado;
 
-    @Column(name = "valor_anterior", columnDefinition = "TEXT")
+    @Field("valor_anterior")
     private String valorAnterior;
 
-    @Column(name = "valor_nuevo", columnDefinition = "TEXT")
+    @Field("valor_nuevo")
     private String valorNuevo;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "modificado_por", length = 36)
+    @Field("modificado_por")
     private String modificadoPor;
 
-    @CreationTimestamp
-    @Column(name = "fecha_modificacion", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_modificacion")
     private LocalDateTime fechaModificacion;
 }

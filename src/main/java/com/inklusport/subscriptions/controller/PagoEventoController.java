@@ -39,6 +39,11 @@ public class PagoEventoController {
         return ResponseEntity.ok(pagoEventoService.historialUsuario(id(principal)));
     }
 
+    @GetMapping("/recibidos")
+    public ResponseEntity<List<PagoEventoResponse>> historialOrganizador(@AuthenticationPrincipal String principal) {
+        return ResponseEntity.ok(pagoEventoService.historialOrganizador(id(principal)));
+    }
+
     @GetMapping("/{pagoId}/comprobante")
     public ResponseEntity<Resource> descargarComprobante(@AuthenticationPrincipal String principal,
                                                            Authentication authentication,

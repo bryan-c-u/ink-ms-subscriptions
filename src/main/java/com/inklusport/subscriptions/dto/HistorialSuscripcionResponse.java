@@ -20,5 +20,12 @@ public class HistorialSuscripcionResponse {
     private String planAnteriorNombre;
     private Long planNuevoId;
     private String planNuevoNombre;
+    private String estadoAnterior;
+    private String estadoNuevo;
+    /** Motivo u observación opcional, solo presente en cambios de estado aplicados por un admin. */
+    private String notas;
+    /** UUID del admin que aplicó el cambio, o {@code null} si fue el propio organizador o el sistema. */
+    private String realizadoPor;
+    private String realizadoPorEmail;
     private LocalDateTime fechaMovimiento;
 }

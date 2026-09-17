@@ -1,55 +1,54 @@
 package com.inklusport.subscriptions.entity;
 
 import com.inklusport.subscriptions.enums.Pasarela;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "webhook_pasarela")
+/** RF68: bitácora de notificaciones IPN / webhooks (idempotencia). */
+@Document(collection = "webhook_pasarela")
+@CompoundIndex(name = "idx_webhook_externo", def = "{'pasarela': 1, 'id_externo': 1}")
+@CompoundIndex(name = "idx_webhook_pendiente", def = "{'procesado': 1, 'fecha_recepcion': 1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class WebhookPasarela {
+public class WebhookPasarela implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
     private Pasarela pasarela = Pasarela.MERCADOPAGO;
 
-    @Column(name = "tipo_notificacion", nullable = false, length = 80)
+    /** payment, merchant_order, plan, subscription, ... */
+    @Field("tipo_notificacion")
     private String tipoNotificacion;
 
-    @Column(name = "id_externo", length = 100)
+    @Field("id_externo")
     private String idExterno;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaccion_id")
-    private TransaccionPasarela transaccion;
+    @Field("transaccion_id")
+    private Long transaccionId;
 
-    @Column(nullable = false, columnDefinition = "json")
     private String payload;
 
-    @Column(name = "firma_recibida", length = 255)
+    @Field("firma_recibida")
     private String firmaRecibida;
 
-    @Column(nullable = false)
     private Boolean procesado = false;
 
-    @Column(length = 500)
     private String resultado;
 
-    @CreationTimestamp
-    @Column(name = "fecha_recepcion", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_recepcion")
     private LocalDateTime fechaRecepcion;
 
-    @Column(name = "fecha_proceso")
+    @Field("fecha_proceso")
     private LocalDateTime fechaProceso;
 }

@@ -1,46 +1,47 @@
 package com.inklusport.subscriptions.entity;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "notificacion_vencimiento")
+/** RF60 — avisos de vencimiento generados por el job del sistema. */
+@Document(collection = "notificacion_vencimiento")
+@CompoundIndex(name = "uk_notif_ciclo",
+        def = "{'suscripcion_id': 1, 'dias_antes': 1, 'fecha_programada': 1}", unique = true)
+@CompoundIndex(name = "idx_notif_pendiente", def = "{'estado': 1, 'fecha_programada': 1}")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotificacionVencimiento {
+public class NotificacionVencimiento implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "suscripcion_id", nullable = false)
-    private Suscripcion suscripcion;
+    @Field("suscripcion_id")
+    private Long suscripcionId;
 
-    @Column(name = "dias_antes", nullable = false)
+    @Field("dias_antes")
     private Integer diasAntes;
 
-    @Column(nullable = false, length = 20)
     private String canal = "EMAIL";
 
-    @Column(nullable = false, length = 20)
     private String estado = "PENDIENTE";
 
-    @Column(name = "fecha_programada", nullable = false)
+    @Field("fecha_programada")
     private LocalDate fechaProgramada;
 
-    @Column(name = "fecha_envio")
+    @Field("fecha_envio")
     private LocalDateTime fechaEnvio;
 
-    @Column(length = 150)
     private String destinatario;
 
-    @Column(name = "error_envio", length = 500)
+    @Field("error_envio")
     private String errorEnvio;
 }

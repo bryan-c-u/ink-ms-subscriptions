@@ -2,20 +2,13 @@ spring:
   application:
     name: ink-ms-subscriptions
 
-  datasource:
-    url: jdbc:mysql://mysql:3306/inklusport_subscriptions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-    username: root
-    password:
-    driver-class-name: com.mysql.cj.jdbc.Driver
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://mongodb:27017/inklusport_subscriptions}
+    database: ${MONGODB_DB:inklusport_subscriptions}
 
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format-sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
+  data:
+    mongodb:
+      auto-index-creation: true
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}

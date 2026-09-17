@@ -16,6 +16,7 @@ import com.inklusport.subscriptions.enums.TipoMovimiento;
 import com.inklusport.subscriptions.enums.TipoPagoSuscripcion;
 import com.inklusport.subscriptions.exception.PagoNotFoundException;
 import com.inklusport.subscriptions.exception.PlanNotFoundException;
+import com.inklusport.subscriptions.exception.SuscripcionNotFoundException;
 import com.inklusport.subscriptions.mercadopago.PaymentStatusResult;
 import com.inklusport.subscriptions.repository.ComprobantePagoRepository;
 import com.inklusport.subscriptions.repository.HistorialSuscripcionRepository;
@@ -27,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -62,7 +62,6 @@ public class PagoSuscripcionService {
      * @param planAplicar plan que se va a aplicar
      * @return datos de checkout del pago
      */
-    @Transactional
     public PagoCheckoutResponse iniciarPago(Suscripcion suscripcion, Plan planAplicar) {
         if (planAplicar.getPrecio().compareTo(BigDecimal.ZERO) == 0) {
             activarSuscripcion(suscripcion, planAplicar);
@@ -77,7 +76,8 @@ public class PagoSuscripcionService {
 
         TipoPagoSuscripcion tipo = resolverTipo(suscripcion, planAplicar);
         PagoSuscripcion pago = new PagoSuscripcion();
-        pago.setSuscripcion(suscripcion);
+        pago.setSuscripcionId(suscripcion.getId());
+        pago.setOrganizadorId(suscripcion.getOrganizadorId());
         pago.setMonto(planAplicar.getPrecio());
         pago.setMoneda(planAplicar.getMoneda() != null ? planAplicar.getMoneda() : "COP");
         pago.setEstado(EstadoPago.PENDIENTE);
@@ -105,7 +105,6 @@ public class PagoSuscripcionService {
      * {@link #confirmarPago} para activar la suscripcion y emitir el comprobante, igual
      * que si la confirmacion viniera del webhook.
      */
-    @Transactional
     public PagoEstadoResponse pagarConTarjeta(String principal, String referencia, PagoTarjetaRequest datos,
                                                boolean esAdmin) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
@@ -113,7 +112,7 @@ public class PagoSuscripcionService {
                         "No se encontro el pago de suscripcion con referencia: " + referencia));
 
         String organizadorId = organizerIdentityService.resolveUserId(principal);
-        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(organizadorId)) {
+        if (!esAdmin && !pago.getOrganizadorId().equals(organizadorId)) {
             throw new AccessDeniedException("No tienes acceso a este pago");
         }
 
@@ -140,7 +139,6 @@ public class PagoSuscripcionService {
      *
      * @param status resultado consultado en la pasarela
      */
-    @Transactional
     public void confirmarPago(PaymentStatusResult status) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(status.getReferenciaExterna())
                 .orElseThrow(() -> new PagoNotFoundException(
@@ -153,21 +151,22 @@ public class PagoSuscripcionService {
 
         pago.setEstado(status.getEstado());
         pago.setMetodoPago(status.getMetodoPago());
-        if (pago.getTransaccion() != null) {
-            TransaccionPasarela tx = pago.getTransaccion();
-            tx.setPagoExternoId(status.getPaymentIdExterno());
-            tx.setEstadoPasarela(status.getEstadoPasarela());
-            tx.setDetalleEstado(status.getDetalleEstado());
-            tx.setMetodoPago(status.getMetodoPago());
-            tx.setTipoPago(status.getTipoPago());
-            transaccionPasarelaRepository.save(tx);
+        if (pago.getTransaccionId() != null) {
+            transaccionPasarelaRepository.findById(pago.getTransaccionId()).ifPresent(tx -> {
+                tx.setPagoExternoId(status.getPaymentIdExterno());
+                tx.setEstadoPasarela(status.getEstadoPasarela());
+                tx.setDetalleEstado(status.getDetalleEstado());
+                tx.setMetodoPago(status.getMetodoPago());
+                tx.setTipoPago(status.getTipoPago());
+                transaccionPasarelaRepository.save(tx);
+            });
         }
         pagoSuscripcionRepository.save(pago);
 
         if (status.getEstado() == EstadoPago.APROBADO) {
             Long planId = extraerPlanId(status.getReferenciaExterna());
             Plan plan = planRepository.findById(planId).orElseThrow(() -> new PlanNotFoundException(planId));
-            Suscripcion suscripcion = activarSuscripcion(pago.getSuscripcion(), plan);
+            Suscripcion suscripcion = activarSuscripcion(obtenerSuscripcion(pago), plan);
             try {
                 var comprobante = comprobanteService.generarComprobanteSuscripcion(
                         pago, "Suscripcion plan " + plan.getNombre());
@@ -180,9 +179,8 @@ public class PagoSuscripcionService {
                 log.error("Pago {} aprobado pero fallo el comprobante: {}", pago.getId(), e.getMessage(), e);
             }
         } else if (status.getEstado() == EstadoPago.RECHAZADO || status.getEstado() == EstadoPago.CANCELADO) {
-            Suscripcion suscripcion = pago.getSuscripcion();
-            boolean primeraVez = historialSuscripcionRepository
-                    .findBySuscripcionIdOrderByFechaMovimientoDesc(suscripcion.getId()).isEmpty();
+            Suscripcion suscripcion = obtenerSuscripcion(pago);
+            boolean primeraVez = !historialSuscripcionRepository.existsBySuscripcionId(suscripcion.getId());
             if (primeraVez) {
                 suscripcion.setEstado(EstadoSuscripcion.CANCELADA);
                 suscripcionRepository.save(suscripcion);
@@ -197,13 +195,11 @@ public class PagoSuscripcionService {
      * @param plan        plan a aplicar
      * @return suscripción actualizada
      */
-    @Transactional
     public Suscripcion activarSuscripcion(Suscripcion suscripcion, Plan plan) {
         LocalDate hoy = LocalDate.now();
-        boolean primeraVez = historialSuscripcionRepository
-                .findBySuscripcionIdOrderByFechaMovimientoDesc(suscripcion.getId()).isEmpty();
-        boolean cambioPlan = !primeraVez && !suscripcion.getPlan().getId().equals(plan.getId());
-        Long planAnteriorId = suscripcion.getPlan() != null ? suscripcion.getPlan().getId() : null;
+        boolean primeraVez = !historialSuscripcionRepository.existsBySuscripcionId(suscripcion.getId());
+        Long planAnteriorId = suscripcion.getPlanId();
+        boolean cambioPlan = !primeraVez && !plan.getId().equals(planAnteriorId);
         LocalDate fechaFinAnterior = suscripcion.getFechaFin();
 
         LocalDate baseFecha = (suscripcion.getEstado() == EstadoSuscripcion.ACTIVA
@@ -229,11 +225,14 @@ public class PagoSuscripcionService {
         suscripcion = suscripcionRepository.save(suscripcion);
 
         HistorialSuscripcion historial = new HistorialSuscripcion();
-        historial.setSuscripcion(suscripcion);
+        historial.setSuscripcionId(suscripcion.getId());
+        historial.setOrganizadorId(suscripcion.getOrganizadorId());
         historial.setTipoMovimiento(primeraVez ? TipoMovimiento.CREACION
                 : (cambioPlan ? TipoMovimiento.CAMBIO_PLAN : TipoMovimiento.RENOVACION));
         historial.setPlanAnteriorId(primeraVez ? null : planAnteriorId);
+        historial.setPlanAnteriorNombre(primeraVez ? null : nombrePlan(planAnteriorId));
         historial.setPlanNuevoId(plan.getId());
+        historial.setPlanNuevoNombre(plan.getNombre());
         historial.setEstadoNuevo(EstadoSuscripcion.ACTIVA.name());
         historial.setFechaFinAnterior(fechaFinAnterior);
         historial.setFechaFinNueva(suscripcion.getFechaFin());
@@ -247,16 +246,15 @@ public class PagoSuscripcionService {
      * verificacion de propiedad (el organizador solo ve los suyos; un ADMIN, todos).
      * Solo lectura: la reconciliacion contra Mercado Pago la orquesta {@link PagoConsultaService}.
      */
-    @Transactional(readOnly = true)
     public PagoEstadoResponse estadoActual(String principal, String referencia, boolean esAdmin) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findByReferenciaTransaccion(referencia)
                 .orElseThrow(() -> new PagoNotFoundException(
                         "No se encontro el pago de suscripcion con referencia: " + referencia));
-        Suscripcion suscripcion = pago.getSuscripcion();
         String organizadorId = organizerIdentityService.resolveUserId(principal);
-        if (!esAdmin && !suscripcion.getOrganizadorId().equals(organizadorId)) {
+        if (!esAdmin && !pago.getOrganizadorId().equals(organizadorId)) {
             throw new AccessDeniedException("No tienes acceso a este pago");
         }
+        Suscripcion suscripcion = obtenerSuscripcion(pago);
         return PagoEstadoResponse.builder()
                 .referencia(referencia)
                 .tipo("SUSCRIPCION")
@@ -274,18 +272,28 @@ public class PagoSuscripcionService {
      * @param suscripcionId identificador de la suscripción
      * @return pagos ordenados por fecha descendente
      */
-    @Transactional(readOnly = true)
     public List<PagoSuscripcionResponse> listarPorSuscripcion(Long suscripcionId) {
         return pagoSuscripcionRepository.findBySuscripcionIdOrderByFechaPagoDesc(suscripcionId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * RF61: todos los pagos de planes del organizador (Mongo guarda organizador_id en el pago).
+     *
+     * @param organizadorId identificador del organizador
+     * @return pagos más recientes primero
+     */
+    public List<PagoSuscripcionResponse> listarPorOrganizador(String organizadorId) {
+        return pagoSuscripcionRepository.findByOrganizadorIdOrderByFechaPagoDesc(organizadorId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
     public java.io.File obtenerComprobante(Long pagoId, String requesterId, boolean esAdmin) {
         PagoSuscripcion pago = pagoSuscripcionRepository.findById(pagoId)
                 .orElseThrow(() -> new PagoNotFoundException("No se encontro el pago de suscripcion con id: " + pagoId));
-        if (!esAdmin && !pago.getSuscripcion().getOrganizadorId().equals(requesterId)) {
+        if (!esAdmin && !pago.getOrganizadorId().equals(requesterId)) {
             throw new org.springframework.security.access.AccessDeniedException("No tienes acceso a este comprobante");
         }
         var comprobante = comprobantePagoRepository.findByPagoSuscripcionId(pagoId)
@@ -305,15 +313,25 @@ public class PagoSuscripcionService {
      * @return tipo de pago
      */
     private TipoPagoSuscripcion resolverTipo(Suscripcion suscripcion, Plan plan) {
-        boolean primeraVez = historialSuscripcionRepository
-                .findBySuscripcionIdOrderByFechaMovimientoDesc(suscripcion.getId()).isEmpty();
-        if (primeraVez) {
+        if (!historialSuscripcionRepository.existsBySuscripcionId(suscripcion.getId())) {
             return TipoPagoSuscripcion.NUEVA;
         }
-        if (!suscripcion.getPlan().getId().equals(plan.getId())) {
+        if (!plan.getId().equals(suscripcion.getPlanId())) {
             return TipoPagoSuscripcion.CAMBIO_PLAN;
         }
         return TipoPagoSuscripcion.RENOVACION;
+    }
+
+    /**
+     * Carga la suscripción referenciada por el pago. En Mongo no hay JOIN: el pago solo
+     * guarda {@code suscripcion_id}, así que el documento se resuelve al usarlo.
+     *
+     * @param pago pago de suscripción persistido
+     * @return suscripción asociada
+     */
+    private Suscripcion obtenerSuscripcion(PagoSuscripcion pago) {
+        return suscripcionRepository.findById(pago.getSuscripcionId())
+                .orElseThrow(() -> new SuscripcionNotFoundException(pago.getSuscripcionId()));
     }
 
     /**
@@ -337,8 +355,11 @@ public class PagoSuscripcionService {
         var comprobante = comprobantePagoRepository.findByPagoSuscripcionId(pago.getId()).orElse(null);
         return PagoSuscripcionResponse.builder()
                 .id(pago.getId())
-                .suscripcionId(pago.getSuscripcion().getId())
+                .suscripcionId(pago.getSuscripcionId())
+                .organizadorId(pago.getOrganizadorId())
+                .tipo(pago.getTipo())
                 .monto(pago.getMonto())
+                .moneda(pago.getMoneda())
                 .metodoPago(pago.getMetodoPago())
                 .referenciaTransaccion(pago.getReferenciaTransaccion())
                 .estado(pago.getEstado())
@@ -346,5 +367,12 @@ public class PagoSuscripcionService {
                 .comprobanteId(comprobante != null ? comprobante.getId() : null)
                 .numeroComprobante(comprobante != null ? comprobante.getNumeroComprobante() : null)
                 .build();
+    }
+
+    private String nombrePlan(Long planId) {
+        if (planId == null) {
+            return null;
+        }
+        return planRepository.findById(planId).map(Plan::getNombre).orElse(null);
     }
 }

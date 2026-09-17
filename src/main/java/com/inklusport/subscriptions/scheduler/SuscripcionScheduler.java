@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,16 +37,16 @@ public class SuscripcionScheduler {
     private String diasAvisoVencimiento;
 
     @Scheduled(cron = "0 0 1 * * *")
-    @Transactional
     public void marcarSuscripcionesVencidas() {
         List<Suscripcion> vencidas = suscripcionRepository
                 .findByEstadoAndFechaFinBefore(EstadoSuscripcion.ACTIVA, LocalDate.now());
         for (Suscripcion s : vencidas) {
             s.setEstado(EstadoSuscripcion.VENCIDA);
             HistorialSuscripcion h = new HistorialSuscripcion();
-            h.setSuscripcion(s);
+            h.setSuscripcionId(s.getId());
+            h.setOrganizadorId(s.getOrganizadorId());
             h.setTipoMovimiento(TipoMovimiento.VENCIMIENTO);
-            h.setPlanNuevoId(s.getPlan().getId());
+            h.setPlanNuevoId(s.getPlanId());
             h.setEstadoAnterior(EstadoSuscripcion.ACTIVA.name());
             h.setEstadoNuevo(EstadoSuscripcion.VENCIDA.name());
             historialSuscripcionRepository.save(h);
@@ -59,7 +58,6 @@ public class SuscripcionScheduler {
     }
 
     @Scheduled(cron = "0 0 8 * * *")
-    @Transactional
     public void avisarVencimientoProximo() {
         LocalDate hoy = LocalDate.now();
         List<Integer> dias = Arrays.stream(diasAvisoVencimiento.split(","))
@@ -85,14 +83,14 @@ public class SuscripcionScheduler {
                 continue;
             }
             NotificacionVencimiento n = new NotificacionVencimiento();
-            n.setSuscripcion(suscripcion);
+            n.setSuscripcionId(suscripcion.getId());
             n.setDiasAntes((int) diasRestantes);
             n.setFechaProgramada(hoy);
             n.setDestinatario(organizerIdentityService.resolveEmail(suscripcion.getOrganizadorId()));
             try {
                 emailService.enviarAvisoVencimiento(
                         organizerIdentityService.resolveEmail(suscripcion.getOrganizadorId()),
-                        suscripcion.getPlan().getNombre(), (int) diasRestantes);
+                        suscripcion.getPlanNombre(), (int) diasRestantes);
                 n.setEstado("ENVIADA");
                 n.setFechaEnvio(LocalDateTime.now());
             } catch (Exception e) {
@@ -104,7 +102,6 @@ public class SuscripcionScheduler {
     }
 
     @Scheduled(cron = "0 0 0 1 * *")
-    @Transactional
     public void reiniciarContadorEventosMensual() {
         suscripcionRepository.reiniciarContadorEventosMensual(LocalDate.now().withDayOfMonth(1));
         log.info("Contador mensual de eventos reiniciado");

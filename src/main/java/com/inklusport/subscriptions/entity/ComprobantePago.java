@@ -1,76 +1,71 @@
 package com.inklusport.subscriptions.entity;
 
 import com.inklusport.subscriptions.enums.TipoComprobante;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "comprobante_pago")
+/** RF67 — comprobante de pago e inscripción (PDF + envío por correo). */
+@Document(collection = "comprobante_pago")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ComprobantePago {
+public class ComprobantePago implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pago_evento_id")
-    private PagoEvento pagoEvento;
+    @Indexed(sparse = true)
+    @Field("pago_evento_id")
+    private Long pagoEventoId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pago_suscripcion_id")
-    private PagoSuscripcion pagoSuscripcion;
+    @Indexed(sparse = true)
+    @Field("pago_suscripcion_id")
+    private Long pagoSuscripcionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaccion_id")
-    private TransaccionPasarela transaccion;
+    @Field("transaccion_id")
+    private Long transaccionId;
 
-    @Column(name = "numero_comprobante", nullable = false, unique = true, length = 100)
+    @Indexed(unique = true)
+    @Field("numero_comprobante")
     private String numeroComprobante;
 
-    @Column(name = "numero_transaccion", length = 150)
+    @Field("numero_transaccion")
     private String numeroTransaccion;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
     private TipoComprobante tipo;
 
-    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal monto;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
-    @Column(name = "detalle_evento", length = 255)
+    @Field("detalle_evento")
     private String detalleEvento;
 
-    @Column(name = "email_destino", length = 150)
+    @Field("email_destino")
     private String emailDestino;
 
-    @Column(name = "email_enviado", nullable = false)
+    @Field("email_enviado")
     private Boolean emailEnviado = false;
 
-    @Column(name = "fecha_envio")
+    @Field("fecha_envio")
     private LocalDateTime fechaEnvio;
 
-    @Column(name = "error_envio", length = 500)
+    @Field("error_envio")
     private String errorEnvio;
 
-    @Column(name = "url_pdf", length = 500)
+    @Field("url_pdf")
     private String urlPdf;
 
-    @CreationTimestamp
-    @Column(name = "fecha_generacion", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_generacion")
     private LocalDateTime fechaGeneracion;
 }

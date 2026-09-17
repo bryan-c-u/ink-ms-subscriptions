@@ -3,6 +3,7 @@ package com.inklusport.subscriptions.service;
 import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoRequest;
 import com.inklusport.subscriptions.dto.ConfiguracionEventoPagoResponse;
 import com.inklusport.subscriptions.entity.ConfiguracionEventoPago;
+import com.inklusport.subscriptions.entity.Suscripcion;
 import com.inklusport.subscriptions.enums.EstadoSuscripcion;
 import com.inklusport.subscriptions.exception.ConfiguracionEventoPagoNotFoundException;
 import com.inklusport.subscriptions.repository.ConfiguracionEventoPagoRepository;
@@ -11,14 +12,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Servicio de configuración de cobro e inscripción de eventos.
+ * Servicio de configuración de cobro e inscripción de eventos (RF55 / RF63).
+ * El organizador (con plan vigente) marca un evento como de pago y fija el valor;
+ * la comisión sale del plan. Con {@code esPago=true}, la inscripción (RF57) exige
+ * pago desde la primera vez — no hay cupo gratuito de prueba.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,7 +38,6 @@ public class ConfiguracionEventoPagoService {
      * @param request       datos de cobro e inscripción
      * @return configuración creada
      */
-    @Transactional
     public ConfiguracionEventoPagoResponse configurar(String organizadorId, ConfiguracionEventoPagoRequest request) {
         if (configuracionEventoPagoRepository.existsByEventoId(request.getEventoId())) {
             throw new IllegalStateException("El evento " + request.getEventoId() + " ya tiene configuracion de pago");
@@ -63,7 +65,6 @@ public class ConfiguracionEventoPagoService {
      * @param request       nuevos datos de cobro
      * @return configuración actualizada
      */
-    @Transactional
     public ConfiguracionEventoPagoResponse actualizar(String organizadorId, String eventoId,
                                                       ConfiguracionEventoPagoRequest request) {
         ConfiguracionEventoPago config = obtenerPropia(organizadorId, eventoId);
@@ -84,7 +85,6 @@ public class ConfiguracionEventoPagoService {
      * @param eventoId identificador del evento
      * @return configuración del evento
      */
-    @Transactional(readOnly = true)
     public ConfiguracionEventoPagoResponse obtenerPorEvento(String eventoId) {
         return toResponse(obtenerEntidadPorEvento(eventoId));
     }
@@ -95,7 +95,6 @@ public class ConfiguracionEventoPagoService {
      * @param eventoId identificador del evento
      * @return entidad persistida
      */
-    @Transactional(readOnly = true)
     public ConfiguracionEventoPago obtenerEntidadPorEvento(String eventoId) {
         return configuracionEventoPagoRepository.findByEventoId(eventoId)
                 .orElseThrow(() -> new ConfiguracionEventoPagoNotFoundException(eventoId));
@@ -107,7 +106,6 @@ public class ConfiguracionEventoPagoService {
      * @param organizadorId identificador del organizador
      * @return configuraciones del organizador
      */
-    @Transactional(readOnly = true)
     public List<ConfiguracionEventoPagoResponse> listarPorOrganizador(String organizadorId) {
         return configuracionEventoPagoRepository.findByOrganizadorId(organizadorId).stream()
                 .map(this::toResponse)
@@ -130,7 +128,9 @@ public class ConfiguracionEventoPagoService {
     }
 
     /**
-     * Calcula la comisión vigente según la suscripción activa del organizador.
+     * Calcula la comisión vigente según la suscripción activa del organizador. Se lee del
+     * snapshot de la suscripción, no del catálogo: un cambio de precios no puede alterar
+     * la comisión de un evento ya configurado (RF65).
      *
      * @param organizadorId identificador del organizador
      * @return porcentaje de comisión o cero si no hay suscripción activa
@@ -138,9 +138,7 @@ public class ConfiguracionEventoPagoService {
     private BigDecimal comisionVigente(String organizadorId) {
         return suscripcionRepository
                 .findFirstByOrganizadorIdAndEstadoOrderByFechaCreacionDesc(organizadorId, EstadoSuscripcion.ACTIVA)
-                .map(s -> s.getPorcentajeComisionAplicado() != null
-                        ? s.getPorcentajeComisionAplicado()
-                        : s.getPlan().getPorcentajeComision())
+                .map(Suscripcion::getPorcentajeComisionAplicado)
                 .orElse(BigDecimal.ZERO);
     }
 

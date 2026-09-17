@@ -2,22 +2,23 @@ spring:
   application:
     name: ink-ms-subscriptions
 
-  datasource:
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/inklusport_subscriptions?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+  # spring-dotenv no carga el .env con esta version de Spring Boot (incompatibilidad
+  # confirmada). Se reemplaza por el mecanismo nativo de Boot: el .env usa sintaxis
+  # KEY=VALUE identica a un .properties, asi que basta con indicarle el formato con
+  # el sufijo [.properties]. "optional:" evita que falle si el archivo no existe
+  # (por ejemplo en el perfil docker, donde las variables vienen del compose).
+  config:
+    import: optional:file:.env[.properties]
 
-  jpa:
-    hibernate:
-      # El esquema lo crea init-mysql; validate choca CHAR/ENUM de MySQL con el mapeo JPA.
-      ddl-auto: ${JPA_DDL_AUTO:update}
-    show-sql: ${SHOW_SQL:true}
-    open-in-view: false
-    properties:
-      hibernate:
-        format-sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/inklusport_subscriptions}
+    database: ${MONGODB_DB:inklusport_subscriptions}
+
+  data:
+    mongodb:
+      # Crea los índices declarados con @Indexed / @CompoundIndex al arrancar; el script
+      # de init-mongodb solo se ejecuta en un volumen nuevo.
+      auto-index-creation: true
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
@@ -100,28 +101,22 @@ spring:
   config:
     activate:
       on-profile: docker
-  datasource:
-    url: ${MYSQL_URL:jdbc:mysql://mysql:3306/inklusport_subscriptions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8}
-  jpa:
-    hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:none}
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://mongodb:27017/inklusport_subscriptions}
+    database: ${MONGODB_DB:inklusport_subscriptions}
 
 ---
 spring:
   config:
     activate:
       on-profile: test
-  datasource:
-    url: jdbc:h2:mem:subscriptions;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+  mongodb:
+    uri: mongodb://localhost:27017/inklusport_subscriptions_test
+    database: inklusport_subscriptions_test
+  data:
+    mongodb:
+      # En pruebas no se toca la BD: sin creación de índices el contexto arranca sin Mongo.
+      auto-index-creation: false
   mail:
     host: localhost
     port: 25

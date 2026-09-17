@@ -15,7 +15,6 @@ import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -43,7 +42,6 @@ public class ComprobanteService {
      * @param concepto   descripción del cobro
      * @return comprobante persistido
      */
-    @Transactional
     public ComprobantePago generarComprobanteEvento(PagoEvento pagoEvento, String concepto) {
         return generar(pagoEvento, null, TipoComprobante.INSCRIPCION, concepto, pagoEvento.getMonto(),
                 pagoEvento.getMoneda(), pagoEvento.getReferenciaTransaccion(), pagoEvento.getFechaPago(),
@@ -57,11 +55,10 @@ public class ComprobanteService {
      * @param concepto        descripción del cobro
      * @return comprobante persistido
      */
-    @Transactional
     public ComprobantePago generarComprobanteSuscripcion(PagoSuscripcion pagoSuscripcion, String concepto) {
         return generar(null, pagoSuscripcion, TipoComprobante.SUSCRIPCION, concepto, pagoSuscripcion.getMonto(),
                 pagoSuscripcion.getMoneda(), pagoSuscripcion.getReferenciaTransaccion(), pagoSuscripcion.getFechaPago(),
-                pagoSuscripcion.getSuscripcion().getOrganizadorId());
+                pagoSuscripcion.getOrganizadorId());
     }
 
     /**
@@ -96,10 +93,10 @@ public class ComprobanteService {
         File pdf = generarPdf(numero, concepto, monto, moneda, referencia, fechaPago);
 
         ComprobantePago comprobante = new ComprobantePago();
-        comprobante.setPagoEvento(pagoEvento);
-        comprobante.setPagoSuscripcion(pagoSuscripcion);
-        comprobante.setTransaccion(pagoEvento != null ? pagoEvento.getTransaccion()
-                : (pagoSuscripcion != null ? pagoSuscripcion.getTransaccion() : null));
+        comprobante.setPagoEventoId(pagoEvento != null ? pagoEvento.getId() : null);
+        comprobante.setPagoSuscripcionId(pagoSuscripcion != null ? pagoSuscripcion.getId() : null);
+        comprobante.setTransaccionId(pagoEvento != null ? pagoEvento.getTransaccionId()
+                : (pagoSuscripcion != null ? pagoSuscripcion.getTransaccionId() : null));
         comprobante.setNumeroComprobante(numero);
         comprobante.setNumeroTransaccion(referencia);
         comprobante.setTipo(tipo);

@@ -33,7 +33,7 @@ public class PlanRequest {
     @Min(1)
     private Integer duracionDias;
 
-    private Boolean esGratuito;
-    private Boolean esPlanInicial;
+    private Boolean esGratuito = false;
+    private Boolean esPlanInicial = false;
     private List<String> beneficios;
 }

@@ -2,20 +2,27 @@ package com.inklusport.subscriptions.service;
 
 import com.inklusport.subscriptions.dto.ReporteEventoItem;
 import com.inklusport.subscriptions.dto.ReporteFinancieroResponse;
+import com.inklusport.subscriptions.entity.PagoEvento;
+import com.inklusport.subscriptions.entity.PagoSuscripcion;
 import com.inklusport.subscriptions.enums.EstadoPago;
 import com.inklusport.subscriptions.repository.PagoEventoRepository;
 import com.inklusport.subscriptions.repository.PagoSuscripcionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 /**
  * Servicio de reportes financieros de eventos y suscripciones.
+ *
+ * El agrupado por evento se hace en memoria sobre los pagos APROBADOS del rango: son
+ * pocos documentos por período y así el reporte no depende de un pipeline de agregación
+ * ni de cómo Mongo represente los importes decimales.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,11 +39,10 @@ public class ReporteFinancieroService {
      * @param hasta         fin del período
      * @return reporte de ingresos por eventos
      */
-    @Transactional(readOnly = true)
     public ReporteFinancieroResponse reporteOrganizador(String organizadorId, LocalDateTime desde, LocalDateTime hasta) {
-        return construir(desde, hasta,
-                mapFilas(pagoEventoRepository.reportePorOrganizadorYEvento(organizadorId, EstadoPago.APROBADO, desde, hasta)),
-                BigDecimal.ZERO);
+        List<PagoEvento> pagos = pagoEventoRepository.findByOrganizadorIdAndEstadoAndFechaPagoBetween(
+                organizadorId, EstadoPago.APROBADO, desde, hasta);
+        return construir(desde, hasta, agruparPorEvento(pagos), BigDecimal.ZERO);
     }
 
     /**
@@ -46,13 +52,37 @@ public class ReporteFinancieroService {
      * @param hasta fin del período
      * @return reporte consolidado de la plataforma
      */
-    @Transactional(readOnly = true)
     public ReporteFinancieroResponse reporteAdmin(LocalDateTime desde, LocalDateTime hasta) {
         BigDecimal ingresosPorSuscripciones = pagoSuscripcionRepository
-                .sumMontoByEstadoAndFechaPagoBetween(EstadoPago.APROBADO, desde, hasta);
-        return construir(desde, hasta,
-                mapFilas(pagoEventoRepository.reporteGlobalPorEvento(EstadoPago.APROBADO, desde, hasta)),
-                ingresosPorSuscripciones);
+                .findByEstadoAndFechaPagoBetween(EstadoPago.APROBADO, desde, hasta).stream()
+                .map(PagoSuscripcion::getMonto)
+                .reduce(BigDecimal.ZERO, ReporteFinancieroService::sumar);
+        List<PagoEvento> pagos = pagoEventoRepository.findByEstadoAndFechaPagoBetween(
+                EstadoPago.APROBADO, desde, hasta);
+        return construir(desde, hasta, agruparPorEvento(pagos), ingresosPorSuscripciones);
+    }
+
+    /**
+     * Agrupa los pagos aprobados por evento acumulando inscritos, monto y comisión.
+     *
+     * @param pagos pagos de evento del período
+     * @return detalle por evento
+     */
+    private List<ReporteEventoItem> agruparPorEvento(List<PagoEvento> pagos) {
+        Map<String, Acumulado> porEvento = new LinkedHashMap<>();
+        for (PagoEvento pago : pagos) {
+            porEvento.computeIfAbsent(pago.getEventoId(), k -> new Acumulado()).sumar(pago);
+        }
+
+        List<ReporteEventoItem> detalle = new ArrayList<>(porEvento.size());
+        porEvento.forEach((eventoId, acumulado) -> detalle.add(ReporteEventoItem.builder()
+                .eventoId(eventoId)
+                .nombreEvento(acumulado.nombreEvento)
+                .numeroInscritos(acumulado.inscritos)
+                .montoTotal(acumulado.monto)
+                .comisionEstimada(acumulado.comision)
+                .build()));
+        return detalle;
     }
 
     /**
@@ -80,40 +110,24 @@ public class ReporteFinancieroService {
                 .build();
     }
 
-    /**
-     * Convierte filas agregadas del repositorio a ítems de reporte.
-     *
-     * @param filas filas de evento, inscritos, monto y comisión
-     * @return detalle por evento
-     */
-    private List<ReporteEventoItem> mapFilas(List<Object[]> filas) {
-        return filas.stream().map(fila -> {
-            String eventoId = (String) fila[0];
-            long numeroInscritos = ((Number) fila[1]).longValue();
-            BigDecimal montoTotal = toBigDecimal(fila[2]);
-            BigDecimal comision = toBigDecimal(fila.length > 3 ? fila[3] : BigDecimal.ZERO);
-            return ReporteEventoItem.builder()
-                    .eventoId(eventoId)
-                    .numeroInscritos(numeroInscritos)
-                    .montoTotal(montoTotal)
-                    .comisionEstimada(comision)
-                    .build();
-        }).collect(Collectors.toList());
+    private static BigDecimal sumar(BigDecimal total, BigDecimal valor) {
+        return valor != null ? total.add(valor) : total;
     }
 
-    /**
-     * Normaliza un valor numérico a {@link BigDecimal}.
-     *
-     * @param value valor a convertir
-     * @return monto o cero si es nulo
-     */
-    private BigDecimal toBigDecimal(Object value) {
-        if (value instanceof BigDecimal bd) {
-            return bd;
+    /** Totales de un evento mientras se recorre la lista de pagos. */
+    private static final class Acumulado {
+        private long inscritos;
+        private String nombreEvento;
+        private BigDecimal monto = BigDecimal.ZERO;
+        private BigDecimal comision = BigDecimal.ZERO;
+
+        private void sumar(PagoEvento pago) {
+            inscritos++;
+            if (nombreEvento == null && pago.getNombreEvento() != null && !pago.getNombreEvento().isBlank()) {
+                nombreEvento = pago.getNombreEvento();
+            }
+            monto = ReporteFinancieroService.sumar(monto, pago.getMonto());
+            comision = ReporteFinancieroService.sumar(comision, pago.getComisionPlataforma());
         }
-        if (value == null) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(((Number) value).doubleValue());
     }
 }

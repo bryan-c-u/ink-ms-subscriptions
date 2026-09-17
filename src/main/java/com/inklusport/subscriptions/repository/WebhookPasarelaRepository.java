@@ -1,11 +1,12 @@
 package com.inklusport.subscriptions.repository;
 
 import com.inklusport.subscriptions.entity.WebhookPasarela;
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.inklusport.subscriptions.enums.Pasarela;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface WebhookPasarelaRepository extends JpaRepository<WebhookPasarela, Long> {
+public interface WebhookPasarelaRepository extends MongoRepository<WebhookPasarela, Long> {
 
-    Optional<WebhookPasarela> findFirstByPasarelaAndIdExterno(com.inklusport.subscriptions.enums.Pasarela pasarela, String idExterno);
+    Optional<WebhookPasarela> findFirstByPasarelaAndIdExterno(Pasarela pasarela, String idExterno);
 }

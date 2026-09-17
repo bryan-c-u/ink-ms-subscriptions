@@ -1,53 +1,53 @@
 package com.inklusport.subscriptions.entity;
 
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "configuracion_evento_pago")
+/** RF63 — evento gratuito o de pago (valor de inscripción). */
+@Document(collection = "configuracion_evento_pago")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConfiguracionEventoPago {
+public class ConfiguracionEventoPago implements DocumentoSecuencial {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "evento_id", nullable = false, unique = true, length = 36)
+    @Indexed(unique = true)
+    @Field("evento_id")
     private String eventoId;
 
-    @Column(name = "organizador_id", nullable = false, length = 100)
+    @Indexed
+    @Field("organizador_id")
     private String organizadorId;
 
-    @Column(name = "es_pago", nullable = false)
+    @Field("es_pago")
     private Boolean esPago = false;
 
-    @Column(name = "valor_inscripcion", precision = 12, scale = 2)
+    @Field("valor_inscripcion")
     private BigDecimal valorInscripcion;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(nullable = false, length = 3)
     private String moneda = "COP";
 
-    @Column(name = "porcentaje_comision", precision = 5, scale = 2)
+    /** Snapshot del plan del organizador al configurar el evento. */
+    @Field("porcentaje_comision")
     private BigDecimal porcentajeComision;
 
-    @CreationTimestamp
-    @Column(name = "fecha_creacion", nullable = false, updatable = false)
+    @CreatedDate
+    @Field("fecha_creacion")
     private LocalDateTime fechaCreacion;
 
-    @UpdateTimestamp
-    @Column(name = "fecha_actualizacion", nullable = false)
+    @LastModifiedDate
+    @Field("fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 }
