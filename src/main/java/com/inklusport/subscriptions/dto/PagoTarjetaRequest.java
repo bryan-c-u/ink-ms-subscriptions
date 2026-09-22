@@ -22,8 +22,8 @@ public class PagoTarjetaRequest {
     @NotBlank
     private String cardToken;
 
-    @NotNull
-    @Positive
+    @NotNull(message = "Las cuotas son obligatorias")
+    @Positive(message = "Las cuotas deben ser mayor que 0")
     private Integer installments;
 
     @NotBlank

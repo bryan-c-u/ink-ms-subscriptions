@@ -72,6 +72,7 @@ public class PagoEventoService {
                 .ifPresent(p -> { throw new InscripcionDuplicadaException(usuarioId, eventoId); });
 
         // Reutilizar el PENDIENTE más reciente; si hay duplicados de intentos fallidos, se cancelan.
+        // Si el organizador corrigió el precio (> 0), actualizamos el monto del pendiente.
         List<PagoEvento> pendientes = pagoEventoRepository
                 .findByUsuarioIdAndEventoIdAndEstadoOrderByIdDesc(usuarioId, eventoId, EstadoPago.PENDIENTE);
         if (!pendientes.isEmpty()) {
@@ -81,6 +82,23 @@ public class PagoEventoService {
                 dup.setEstado(EstadoPago.CANCELADO);
                 pagoEventoRepository.save(dup);
                 log.info("Pago evento duplicado {} cancelado (queda {})", dup.getId(), pago.getId());
+            }
+            BigDecimal montoConfig = config.getValorInscripcion();
+            if (montoConfig == null || montoConfig.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException(
+                        "El evento de pago no tiene un valor de inscripcion valido (debe ser mayor a 0)");
+            }
+            if (pago.getMonto() == null || pago.getMonto().compareTo(montoConfig) != 0) {
+                BigDecimal porcentaje = config.getPorcentajeComision() != null
+                        ? config.getPorcentajeComision() : BigDecimal.ZERO;
+                BigDecimal comision = montoConfig.multiply(porcentaje)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                pago.setMonto(montoConfig);
+                pago.setPorcentajeComision(porcentaje);
+                pago.setComisionPlataforma(comision);
+                pago.setMontoNetoOrganizador(montoConfig.subtract(comision));
+                pago = pagoEventoRepository.save(pago);
+                log.info("Pago evento {} actualizado a monto {}", pago.getId(), montoConfig);
             }
             return PagoCheckoutResponse.builder()
                     .pagoId(pago.getId())
@@ -92,6 +110,10 @@ public class PagoEventoService {
         }
 
         BigDecimal monto = config.getValorInscripcion();
+        if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(
+                    "El evento de pago no tiene un valor de inscripcion valido (debe ser mayor a 0)");
+        }
         BigDecimal porcentaje = config.getPorcentajeComision() != null ? config.getPorcentajeComision() : BigDecimal.ZERO;
         BigDecimal comision = monto.multiply(porcentaje).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 

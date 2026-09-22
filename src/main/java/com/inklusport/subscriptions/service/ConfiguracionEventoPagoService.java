@@ -45,6 +45,10 @@ public class ConfiguracionEventoPagoService {
         if (Boolean.TRUE.equals(request.getEsPago()) && request.getValorInscripcion() == null) {
             throw new IllegalArgumentException("Debe indicar el valor de inscripcion para un evento de pago");
         }
+        if (Boolean.TRUE.equals(request.getEsPago())
+                && request.getValorInscripcion().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El valor de inscripcion debe ser mayor a 0");
+        }
 
         ConfiguracionEventoPago config = new ConfiguracionEventoPago();
         config.setEventoId(request.getEventoId());
@@ -70,6 +74,10 @@ public class ConfiguracionEventoPagoService {
         ConfiguracionEventoPago config = obtenerPropia(organizadorId, eventoId);
         if (Boolean.TRUE.equals(request.getEsPago()) && request.getValorInscripcion() == null) {
             throw new IllegalArgumentException("Debe indicar el valor de inscripcion para un evento de pago");
+        }
+        if (Boolean.TRUE.equals(request.getEsPago())
+                && request.getValorInscripcion().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El valor de inscripcion debe ser mayor a 0");
         }
         config.setEsPago(Boolean.TRUE.equals(request.getEsPago()));
         config.setValorInscripcion(config.getEsPago() ? request.getValorInscripcion() : null);
