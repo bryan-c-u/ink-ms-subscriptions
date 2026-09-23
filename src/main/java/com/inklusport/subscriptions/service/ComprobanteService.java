@@ -107,6 +107,7 @@ public class ComprobanteService {
         }
         File regenerado = generarPdf(
                 comprobante.getNumeroComprobante(),
+                comprobante.getTipo(),
                 comprobante.getDetalleEvento(),
                 comprobante.getMonto(),
                 comprobante.getMoneda(),
