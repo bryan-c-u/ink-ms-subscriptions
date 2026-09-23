@@ -298,7 +298,7 @@ public class PagoSuscripcionService {
         }
         var comprobante = comprobantePagoRepository.findByPagoSuscripcionId(pagoId)
                 .orElseThrow(() -> new PagoNotFoundException("El pago " + pagoId + " aun no tiene comprobante"));
-        java.io.File archivo = comprobanteService.obtenerArchivo(comprobante);
+        java.io.File archivo = comprobanteService.asegurarArchivo(comprobante);
         if (archivo == null || !archivo.exists()) {
             throw new PagoNotFoundException("El comprobante del pago " + pagoId + " no tiene un PDF disponible");
         }
