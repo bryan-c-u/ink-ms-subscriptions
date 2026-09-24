@@ -38,7 +38,7 @@ public class PagoEvento implements DocumentoSecuencial {
     @Field("evento_id")
     private String eventoId;
 
-    @Indexed
+    @Indexed(name = "idx_pago_evento_organizador")
     @Field("organizador_id")
     private String organizadorId;
 

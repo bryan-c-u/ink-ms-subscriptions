@@ -18,7 +18,7 @@ spring:
     mongodb:
       # Crea los índices declarados con @Indexed / @CompoundIndex al arrancar; el script
       # de init-mongodb solo se ejecuta en un volumen nuevo.
-      auto-index-creation: true
+      auto-index-creation: false
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}

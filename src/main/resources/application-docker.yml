@@ -8,7 +8,7 @@ spring:
 
   data:
     mongodb:
-      auto-index-creation: true
+      auto-index-creation: false
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
